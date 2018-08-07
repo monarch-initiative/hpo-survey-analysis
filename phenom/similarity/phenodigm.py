@@ -9,7 +9,7 @@ Num = Union[int, float]
 
 
 class SimMetric(Enum):
-    PHENODIGM = 'phenodigm'
+    GEOMETRIC = 'geometric'
     IC = 'ic'
 
 
@@ -32,7 +32,7 @@ class Phenodigm():
             root: str,
             ic_map: Dict[str, float],
             is_same_species: Optional[bool] = True,
-            similarity_type: Union[SimMetric, str, None]= SimMetric.PHENODIGM):
+            similarity_type: Union[SimMetric, str, None]= SimMetric.GEOMETRIC):
 
         self.graph = graph
         self.root = root
@@ -104,7 +104,7 @@ class Phenodigm():
 
         score_matrix = [[]]
 
-        if self.similarity_type == SimMetric.PHENODIGM:
+        if self.similarity_type == SimMetric.GEOMETRIC:
             sim_fn = self.jac_ic_geomean
         elif self.similarity_type == SimMetric.IC:
             sim_fn = self.get_mica_ic
@@ -127,7 +127,7 @@ class Phenodigm():
         score_matrix = []
         if self.is_same_species:
             for pheno in profile:
-                if self.similarity_type == SimMetric.PHENODIGM:
+                if self.similarity_type == SimMetric.GEOMETRIC:
                     score_matrix.append(
                         [math_utils.geometric_mean([1, self.ic_map[pheno]])])
                 elif self.similarity_type == SimMetric.IC:

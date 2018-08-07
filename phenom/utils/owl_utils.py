@@ -1,7 +1,9 @@
 from typing import Set, List, Optional, Dict, Sequence
+from itertools import chain
 from phenom.decorators import memoized
 from phenom.utils import math_utils
 from rdflib import URIRef, BNode, Literal, Graph, RDFS
+from prefixcommons import contract_uri, expand_uri
 
 
 def get_closure(
@@ -11,9 +13,10 @@ def get_closure(
         root: Optional[str]=None,
         reflexive: Optional[bool] = True) -> Set[str]:
 
-    hp_id = int(node.replace("HP:", ""))
-    closure = get_closure_memoized(graph, hp_id, edge, root, reflexive)
-    return {"HP:" + str(node).zfill(7) for node in closure}
+    prefix, reference = node.split(":")
+    reference = int(reference)
+    closure = get_closure_memoized(graph, reference, prefix, edge, root, reflexive)
+    return {"{}:{}".format(prefix, str(node).zfill(7)) for node in closure}
 
 
 def _get_closure(
@@ -26,20 +29,20 @@ def _get_closure(
     nodes = set()
     root_seen = {}
     if node is not None:
-        node = hp_curie2iri(node)
+        node = URIRef(expand_uri(node, strict=True))
     if root is not None:
-        root = hp_curie2iri(root)
+        root = URIRef(expand_uri(root, strict=True))
         root_seen = {root: 1}
     for obj in graph.transitive_objects(node, edge, root_seen):
         if isinstance(obj, Literal) or isinstance(obj, BNode):
             continue
         if not reflexive and node == obj:
             continue
-        nodes.add(hp_iri2curie(str(obj)))
+        nodes.add(contract_uri(str(obj), strict=True)[0])
 
     # Add root to graph
     if root is not None:
-        nodes.add(hp_iri2curie(str(root)))
+        nodes.add(contract_uri(str(root), strict=True)[0])
 
     return nodes
 
@@ -47,14 +50,15 @@ def _get_closure(
 @memoized
 def get_closure_memoized(
         graph: Graph,
-        node: int,
+        node_id: int,
+        curie_prefix: str,
         edge: Optional[URIRef]=None,
         root: Optional[str]=None,
         reflexive: Optional[bool] = True) -> List[int]:
 
-    node = "HP:" + str(node).zfill(7)
+    node = "{}:{}".format(curie_prefix, str(node_id).zfill(7))
     closure = _get_closure(graph, node, edge, root, reflexive)
-    return [int(id.replace("HP:","")) for id in closure]
+    return [int(id.replace("{}:".format(curie_prefix), "")) for id in closure]
 
 
 def get_mica_ic(
@@ -105,16 +109,10 @@ def profile_jaccard(
         graph: Graph,
         root: str) -> float:
     predicate = RDFS['subClassOf']
-    pheno_a_set = {get_closure(graph, pheno, predicate, root) for pheno in profile_a}
-    pheno_b_set = {get_closure(graph, pheno, predicate, root) for pheno in profile_b}
+    pheno_a_set = set(chain.from_iterable(
+        [get_closure(graph, pheno, predicate, root) for pheno in profile_a])
+    )
+    pheno_b_set = set(chain.from_iterable(
+        [get_closure(graph, pheno, predicate, root) for pheno in profile_b])
+    )
     return math_utils.jaccard(pheno_a_set, pheno_b_set)
-
-
-def hp_iri2curie(iri:str) -> str:
-    return iri.replace("http://purl.obolibrary.org/obo/HP_", "HP:")
-
-
-def hp_curie2iri(curie:str) -> URIRef:
-    return URIRef(curie.replace("HP:", "http://purl.obolibrary.org/obo/HP_"))
-
-

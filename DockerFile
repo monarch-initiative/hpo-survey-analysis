@@ -1,8 +1,0 @@
-FROM python:3.6-alpine
-
-ADD . /hpo-subset
-WORKDIR /hpo-subset
-
-RUN pip install -r requirements.txt
-
-ENV PATH="/hpo-subset/scripts/:/hpo-subset/:$PATH"

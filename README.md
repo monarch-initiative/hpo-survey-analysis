@@ -16,6 +16,12 @@ A library for analyzing subsets of the HPO
     pip install -r requirements.txt
     export PYTHONPATH=.:$PYTHONPATH
 
+##### Running notebooks with docker
+
+    docker build . --tag hpo-subset:latest
+    docker run --rm -it -p 8888:8888 --hostname localhost -v "$PWD"/notebooks/:/hpo-subset/notebooks/ hpo-subset jupyter notebook notebooks --ip=0.0.0.0 --allow-root --no-browser
+    Copy the URL and replace "(localhost or 127.0.0.1)" with either "localhost" or "127.0.0.1" (without quotes)
+
 
 #### Features
 - Utilities for generating derived profiles from gold standard annotations, either best match or noisy
