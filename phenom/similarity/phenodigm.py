@@ -1,8 +1,8 @@
 from typing import Sequence, Dict, List, Union, Optional
 from enum import Enum
 from rdflib.graph import Graph
-from rdflib.namespace import RDFS
-from phenom.utils import owl_utils, math_utils
+from phenom.similarity import metric
+from phenom.math import matrix, math
 
 # Union types
 Num = Union[int, float]
@@ -61,11 +61,11 @@ class Phenodigm():
             profile_b: Sequence[str]) -> float:
 
         a2b_matrix = self.get_score_matrix(list(profile_a), list(profile_b))
-        b2a_matrix = math_utils.flip_matrix(a2b_matrix)
+        b2a_matrix = matrix.flip_matrix(a2b_matrix)
         optimal_a_matrix = self.get_optimal_matrix(profile_a)
         optimal_b_matrix = self.get_optimal_matrix(profile_b)
 
-        return math_utils.mean(
+        return math.mean(
             [self.compute_phenodigm_score(a2b_matrix, optimal_a_matrix),
              self.compute_phenodigm_score(b2a_matrix, optimal_b_matrix)])
 
@@ -73,41 +73,21 @@ class Phenodigm():
     def compute_phenodigm_score(
             query_matrix: List[List[float]],
             optimal_matrix: List[List[float]]) -> float:
-        return 100 * math_utils.mean(
-            [math_utils.max_percentage_score(query_matrix, optimal_matrix),
-             math_utils.avg_percentage_score(query_matrix, optimal_matrix)])
-
-    def get_mica_ic(self, pheno_a: str, pheno_b: str) -> Num:
-        predicate = RDFS['subClassOf']
-        p1_closure = owl_utils.get_closure(self.graph, pheno_a, predicate, self.root)
-        p2_closure = owl_utils.get_closure(self.graph, pheno_b, predicate, self.root)
-        return max([self.ic_map[parent]
-                        for parent in p1_closure.intersection(p2_closure)
-                    ])
-
-    def jac_ic_geomean(
-            self,
-            pheno_a: str,
-            pheno_b: str) -> float:
-        """
-        may make more sense in owl_utils
-        """
-        jaccard_sim = owl_utils.pairwise_jaccard(
-            pheno_a, pheno_b, self.graph, self.root)
-        mica = self.get_mica_ic(pheno_a, pheno_b)
-        return math_utils.geometric_mean([jaccard_sim, mica])
+        return 100 * math.mean(
+            [matrix.max_percentage_score(query_matrix, optimal_matrix),
+             matrix.avg_percentage_score(query_matrix, optimal_matrix)])
 
     def get_score_matrix(
             self,
-            profile_a: List[str],
-            profile_b: List[str]) -> List[List[float]]:
+            profile_a: Sequence[str],
+            profile_b: Sequence[str]) -> List[List[float]]:
 
         score_matrix = [[]]
 
         if self.similarity_type == SimMetric.GEOMETRIC:
-            sim_fn = self.jac_ic_geomean
+            sim_fn = metric.jac_ic_geomean
         elif self.similarity_type == SimMetric.IC:
-            sim_fn = self.get_mica_ic
+            sim_fn = metric.get_mica_ic
         else:
             raise NotImplementedError
 
@@ -116,7 +96,7 @@ class Phenodigm():
                 score_matrix.append([])
             for pheno_b in profile_b:
                 score_matrix[index].append(
-                    sim_fn(pheno_a, pheno_b)
+                    sim_fn(pheno_a, pheno_b, self.graph, self.ic_map, self.root)
                 )
         return score_matrix
 
@@ -129,7 +109,7 @@ class Phenodigm():
             for pheno in profile:
                 if self.similarity_type == SimMetric.GEOMETRIC:
                     score_matrix.append(
-                        [math_utils.geometric_mean([1, self.ic_map[pheno]])])
+                        [math.geometric_mean([1, self.ic_map[pheno]])])
                 elif self.similarity_type == SimMetric.IC:
                     score_matrix.append([self.ic_map[pheno]])
                 else:

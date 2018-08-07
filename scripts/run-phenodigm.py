@@ -1,5 +1,6 @@
 from phenom.similarity.phenodigm import Phenodigm
 from phenom.utils import owl_utils
+from phenom.similarity import metric
 from rdflib import Graph, RDFS
 
 pheno_profile1 = ["HP:0001595", "HP:0002360"]
@@ -20,7 +21,6 @@ for line in ic_fh.readlines():
 phenodigm = Phenodigm(hp_graph, root, ic_map)
 
 
-
 print(phenodigm.symmetric_phenodigm(pheno_profile1, pheno_profile2))
 print(phenodigm.phenodigm_compare(pheno_profile1, pheno_profile2))
 print(phenodigm.phenodigm_compare(pheno_profile2, pheno_profile1))
@@ -32,7 +32,6 @@ print(phenodigm.phenodigm_compare(pheno_profile1, pheno_profile2))
 print(phenodigm.phenodigm_compare(pheno_profile2, pheno_profile1))
 
 
-
-print(owl_utils.profile_jaccard(pheno_profile1, pheno_profile2, hp_graph, root))
+print(metric.profile_jaccard(pheno_profile1, pheno_profile2, hp_graph, root))
 
 print([owl_utils.get_closure(hp_graph, pheno, RDFS['subClassOf'], root) for pheno in pheno_profile1])

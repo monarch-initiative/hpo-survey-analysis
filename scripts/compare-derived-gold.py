@@ -3,8 +3,9 @@ from phenom.similarity.phenodigm import Phenodigm
 from phenom.utils import owl_utils
 import argparse
 import logging
-from rdflib import Graph, RDFS
+from rdflib import Graph, RDFS, URIRef
 import random
+from prefixcommons import contract_uri, expand_uri
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -97,8 +98,9 @@ for mondo in disease_list:
         for i in indices:
             sel_phenotype = lay_profile[i]
             # get parent(s) select 1st if multiple
-            objs = hpo.objects(owl_utils.hp_curie2iri(sel_phenotype), RDFS['subClassOf'])
-            lay_profile[i] = owl_utils.hp_iri2curie(str(list(objs)[0]))
+            selected_phenotype = URIRef(expand_uri(sel_phenotype, strict=True)[0])
+            objs = hpo.objects(selected_phenotype, RDFS['subClassOf'])
+            lay_profile[i] = contract_uri(str(list(objs)[0]), strict=True)[0]
 
     if (len(lay_profile) == 0):
         output.write("{}\t{}\t{}\n".format(

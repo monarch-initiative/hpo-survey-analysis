@@ -1,7 +1,5 @@
 from typing import Set, List, Optional, Dict, Sequence
-from itertools import chain
 from phenom.decorators import memoized
-from phenom.utils import math_utils
 from rdflib import URIRef, BNode, Literal, Graph, RDFS
 from prefixcommons import contract_uri, expand_uri
 
@@ -61,24 +59,12 @@ def get_closure_memoized(
     return [int(id.replace("{}:".format(curie_prefix), "")) for id in closure]
 
 
-def get_mica_ic(
-        pheno_a: str,
-        pheno_b: str,
-        graph: Graph,
-        ic_map:Dict[str, float],
-        root) -> float:
-    predicate = RDFS['subClassOf']
-    p1_closure = get_closure(graph, pheno_a, predicate, root)
-    p2_closure = get_closure(graph, pheno_b, predicate, root)
-    return max([ic_map[parent]for parent in p1_closure.intersection(p2_closure)])
-
-
 def get_mica_id(
         pheno_a: str,
         pheno_b: str,
         graph: Graph,
         ic_map:Dict[str, float],
-        root: str) -> float:
+        root: str) -> str:
     """
     Return ID of most informative common anscestor of two phenotypes
     Currently does not handle ambiguity (>1 equal MICAs)
@@ -93,26 +79,3 @@ def get_mica_id(
         if ic_map[pheno] == max_ic:
             mica = pheno
     return mica
-
-
-def pairwise_jaccard(pheno_a: str, pheno_b: str, graph: Graph, root:str) -> float:
-    predicate = RDFS['subClassOf']
-    return math_utils.jaccard(
-        get_closure(graph, pheno_a, predicate, root),
-        get_closure(graph, pheno_b, predicate, root)
-    )
-
-
-def profile_jaccard(
-        profile_a: Sequence[str],
-        profile_b: Sequence[str],
-        graph: Graph,
-        root: str) -> float:
-    predicate = RDFS['subClassOf']
-    pheno_a_set = set(chain.from_iterable(
-        [get_closure(graph, pheno, predicate, root) for pheno in profile_a])
-    )
-    pheno_b_set = set(chain.from_iterable(
-        [get_closure(graph, pheno, predicate, root) for pheno in profile_b])
-    )
-    return math_utils.jaccard(pheno_a_set, pheno_b_set)
