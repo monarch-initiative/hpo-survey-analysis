@@ -1,4 +1,4 @@
-from phenom.similarity.phenodigm import Phenodigm
+from phenom.similarity.semanticsim import SemanticSim
 from phenom.utils import owl_utils
 from phenom.similarity import metric
 from rdflib import Graph, RDFS
@@ -18,20 +18,21 @@ for line in ic_fh.readlines():
     hpo_id, ic = line.rstrip("\n").split("\t")
     ic_map[hpo_id] = float(ic)
 
-phenodigm = Phenodigm(hp_graph, root, ic_map)
+sem_sim = SemanticSim(hp_graph, root, ic_map)
 
 
-print(phenodigm.symmetric_phenodigm(pheno_profile1, pheno_profile2))
-print(phenodigm.phenodigm_compare(pheno_profile1, pheno_profile2))
-print(phenodigm.phenodigm_compare(pheno_profile2, pheno_profile1))
-
-phenodigm = Phenodigm(hp_graph, root, ic_map, True, 'ic')
-
-print(phenodigm.symmetric_phenodigm(pheno_profile1, pheno_profile2))
-print(phenodigm.phenodigm_compare(pheno_profile1, pheno_profile2))
-print(phenodigm.phenodigm_compare(pheno_profile2, pheno_profile1))
-
-
-print(metric.profile_jaccard(pheno_profile1, pheno_profile2, hp_graph, root))
-
-print([owl_utils.get_closure(hp_graph, pheno, RDFS['subClassOf'], root) for pheno in pheno_profile1])
+print("Symmetric phenodigm: ", sem_sim.phenodigm_compare(
+    pheno_profile1, pheno_profile2, is_symmetric=True))
+print("Symmetric owlsim2: ", sem_sim.phenodigm_compare(
+    pheno_profile1, pheno_profile2, is_symmetric=True, similarity_type='ic'))
+print("jaccard sim: ", sem_sim.jaccard_sim(pheno_profile1, pheno_profile2))
+print("sim gic: ", sem_sim.sim_gic(pheno_profile1, pheno_profile2))
+print("resnik sim: ", sem_sim.resnik_sim(pheno_profile1, pheno_profile2))
+print("resnik sim normalized: ", sem_sim.resnik_sim(
+    pheno_profile1, pheno_profile2, is_normalized=True))
+print("resnik sim symmetric norm: ", sem_sim.resnik_sim(
+    pheno_profile1, pheno_profile2, is_normalized=True, is_symmetric=True))
+print("resnik sim symmetric norm avg: ", sem_sim.resnik_sim(
+    pheno_profile1, pheno_profile2, matrix_metric='avg', is_normalized=True, is_symmetric=True))
+print("resnik sim symmetric norm max: ", sem_sim.resnik_sim(
+    pheno_profile1, pheno_profile2, matrix_metric='max', is_normalized=True, is_symmetric=True))

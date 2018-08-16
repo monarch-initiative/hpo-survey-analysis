@@ -1,8 +1,8 @@
-from typing import Set, Union, Sequence, Dict
+from typing import Set, Union, Sequence, Dict, Optional
 from itertools import chain
 from phenom.utils import owl_utils
 from phenom.math import math
-from rdflib import RDFS, Graph
+from rdflib import RDFS, Graph, URIRef
 
 
 # Union types
@@ -19,21 +19,6 @@ def pairwise_jaccard(pheno_a: str, pheno_b: str, graph: Graph, root:str) -> floa
         owl_utils.get_closure(graph, pheno_a, predicate, root),
         owl_utils.get_closure(graph, pheno_b, predicate, root)
     )
-
-
-def profile_jaccard(
-        profile_a: Sequence[str],
-        profile_b: Sequence[str],
-        graph: Graph,
-        root: str) -> float:
-    predicate = RDFS['subClassOf']
-    pheno_a_set = set(chain.from_iterable(
-        [owl_utils.get_closure(graph, pheno, predicate, root) for pheno in profile_a])
-    )
-    pheno_b_set = set(chain.from_iterable(
-        [owl_utils.get_closure(graph, pheno, predicate, root) for pheno in profile_b])
-    )
-    return jaccard(pheno_a_set, pheno_b_set)
 
 
 def get_mica_ic(
@@ -54,9 +39,21 @@ def jac_ic_geomean(
         graph: Graph,
         ic_map: Dict[str, float],
         root) -> float:
-    """
-    may make more sense in owl_utils
-    """
     jaccard_sim = pairwise_jaccard(pheno_a, pheno_b, graph, root)
     mica = get_mica_ic(pheno_a, pheno_b, graph, ic_map, root)
     return math.geometric_mean([jaccard_sim, mica])
+
+
+def get_profile_closure(
+        profile: Sequence[str],
+        graph: Graph,
+        root: str,
+        predicate: Optional[URIRef] = RDFS['subClassOf']) -> Set[str]:
+    """
+    Given a list of phenotypes, get the reflexive closure for each phenotype
+    stored in a single set.  This can be used for jaccard similarity or
+    simGIC
+    """
+    return set(chain.from_iterable(
+        [owl_utils.get_closure(graph, pheno, predicate, root) for pheno in profile])
+    )

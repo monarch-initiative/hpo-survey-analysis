@@ -24,14 +24,30 @@ def max_score(matrix: Sequence[Sequence[Num]]) -> float:
     return max(list(chain.from_iterable(matrix)))
 
 
-def avg_score(matrix: Sequence[Sequence[Num]]) -> float:
+def bma_score(matrix: Sequence[Sequence[Num]]) -> float:
+    """
+    best max average score
+    """
     return math.mean([max(row) for row in matrix])
+
+
+def avg_score(matrix: Sequence[Sequence[Num]]) -> float:
+    """
+    average of every value in the matrix
+    """
+    return math.mean(list(chain.from_iterable(matrix)))
 
 
 def max_percentage_score(
         query_matrix: Sequence[Sequence[Num]],
         optimal_matrix: Sequence[Sequence[float]]) -> float:
     return max_score(query_matrix) / max_score(optimal_matrix)
+
+
+def bma_percentage_score(
+        query_matrix: Sequence[Sequence[Num]],
+        optimal_matrix: Sequence[Sequence[Num]]) -> float:
+    return bma_score(query_matrix) / bma_score(optimal_matrix)
 
 
 def avg_percentage_score(
