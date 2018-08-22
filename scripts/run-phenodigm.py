@@ -36,3 +36,5 @@ print("resnik sim symmetric norm avg: ", sem_sim.resnik_sim(
     pheno_profile1, pheno_profile2, matrix_metric='avg', is_normalized=True, is_symmetric=True))
 print("resnik sim symmetric norm max: ", sem_sim.resnik_sim(
     pheno_profile1, pheno_profile2, matrix_metric='max', is_normalized=True, is_symmetric=True))
+print("cosine sim: ", sem_sim.cosine_sim(pheno_profile1, pheno_profile2))
+print("cosine sim: ", sem_sim.sim_gicosine(pheno_profile1, pheno_profile2))

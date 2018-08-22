@@ -12,17 +12,21 @@ such as scigraph, owlsim, solr, and the monarch app
 """
 
 # Globals and Constants
-SCIGRAPH_URL =    'https://scigraph-data.monarchinitiative.org/scigraph'
+SCIGRAPH_URL =    'https://scigraph-ontology-dev.monarchinitiative.org/scigraph'
 OWLSIM_URL =      'https://monarchinitiative.org/owlsim/'
 MONARCH_SCORE =   'https://monarchinitiative.org/score'
 MONARCH_ASSOC =   'https://solr.monarchinitiative.org/solr/golr/select'
+
+session = requests.Session()
+adapter = requests.adapters.HTTPAdapter(max_retries=10)
+session.mount('https://', adapter)
 
 
 def get_solr_results(solr, params):
     solr_params = copy.deepcopy(params)  # don't mutate input
     result_count = solr_params['rows']
     while solr_params['start'] < result_count:
-        solr_request = requests.get(solr, params=solr_params)
+        solr_request = session.get(solr, params=solr_params)
         response = solr_request.json()
         result_count = response['response']['numFound']
         solr_params['start'] += solr_params['rows']
@@ -32,7 +36,7 @@ def get_solr_results(solr, params):
 
 def get_clique_leader(id):
     url = SCIGRAPH_URL + '/dynamic/cliqueLeader/{}.json'.format(id)
-    sci_request = requests.get(url)
+    sci_request = session.get(url)
     response = sci_request.json()
     try:
         leader = {
@@ -101,7 +105,7 @@ def owlsim_compare(profile_a, profile_b):
         'a': profile_a,
         'b': profile_b
     }
-    sim_req = requests.post(compare_url, data=params)
+    sim_req = session.post(compare_url, data=params)
     try:
         owlsim_results = sim_req.json()
         sim_score = owlsim_results['results'][0]['combinedScore']

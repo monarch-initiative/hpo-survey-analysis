@@ -1,5 +1,5 @@
 from phenom import monarch
-from phenom.similarity.phenodigm import Phenodigm
+from phenom.similarity.semanticsim import SemanticSim
 from phenom.utils import owl_utils
 import argparse
 import logging
@@ -42,7 +42,7 @@ output = open(args.output, 'w')
 pheno_list = set(pheno_fh.read().splitlines())
 disease_list = disease_fh.read().splitlines()
 
-phenodigm = Phenodigm(hpo, root, ic_map)
+sem_sim = SemanticSim(hpo, root, ic_map)
 
 for mondo in disease_list:
     # Get clique leader if list is not mondo
@@ -111,7 +111,7 @@ for mondo in disease_list:
         continue
 
     try:
-        sim_score = phenodigm.symmetric_phenodigm(lay_profile, pheno_profile)
+        sim_score = sem_sim.phenodigm_compare(lay_profile, pheno_profile, is_symmetric=True)
         #sim_score = monarch.owlsim_compare(lay_profile, pheno_profile)
     except ValueError:
         print(lay_profile)
@@ -126,4 +126,3 @@ for mondo in disease_list:
         mondo_label,
         sim_score,
     ))
-

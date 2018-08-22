@@ -79,3 +79,19 @@ def get_mica_id(
         if ic_map[pheno] == max_ic:
             mica = pheno
     return mica
+
+
+def get_descendants(
+        graph: Graph,
+        node: str,
+        edge: Optional[URIRef]=RDFS['subClassOf']) -> List[str]:
+
+    nodes = []
+    node = URIRef(expand_uri(node, strict=True))
+    for sub in graph.transitive_subjects(edge, node):
+        if node == sub:
+            continue
+        if isinstance(sub, Literal):
+            continue
+        nodes.append(contract_uri(str(sub), strict=True)[0])
+    return nodes

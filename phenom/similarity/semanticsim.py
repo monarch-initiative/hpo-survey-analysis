@@ -3,6 +3,7 @@ from enum import Enum
 from rdflib import Graph, URIRef, RDFS
 from phenom.similarity import metric
 from phenom.math import matrix, math
+import math as std_math
 from functools import reduce
 
 
@@ -64,9 +65,51 @@ class SemanticSim():
     def cosine_sim(
             self,
             profile_a: Sequence[str],
-            profile_b: Sequence[str]) -> float:
+            profile_b: Sequence[str],
+            predicate: Optional[URIRef] = RDFS['subClassOf']) -> float:
+        """
+        Implemented as ochai coefficient, or
+        len( A union B) / sqrt(len(A)*len(B))
 
-        pass
+        :param profile_a:
+        :param profile_b:
+        :return:
+        """
+        pheno_a_set = metric.get_profile_closure(
+            profile_a, self.graph, self.root, predicate)
+        pheno_b_set = metric.get_profile_closure(
+            profile_b, self.graph, self.root, predicate)
+        numerator = len(pheno_a_set.intersection(pheno_b_set))
+        denominator = std_math.sqrt(len(pheno_a_set) * len(pheno_b_set))
+        return numerator / denominator
+
+    def sim_gicosine(
+            self,
+            profile_a: Sequence[str],
+            profile_b: Sequence[str],
+            predicate: Optional[URIRef] = RDFS['subClassOf']) -> float:
+        """
+        simGICosine
+        Cosine similarity where instead of vectors of 0 and 1 for
+        present/absent, we use vectors of information content values
+        for present classes, and 0 for absent classes
+        """
+        a_closure = metric.get_profile_closure(
+            profile_a, self.graph, self.root, predicate)
+        b_closure = metric.get_profile_closure(
+            profile_b, self.graph, self.root, predicate)
+        numerator = reduce(
+            lambda x, y: x + y,
+            [std_math.pow(self.ic_map[pheno], 2) for pheno in a_closure.intersection(b_closure)]
+        )
+        denominator = std_math.sqrt(reduce(
+            lambda x, y: x + y,
+            [std_math.pow(self.ic_map[pheno], 2) for pheno in a_closure]
+        )) * std_math.sqrt(reduce(
+            lambda x, y: x + y,
+            [std_math.pow(self.ic_map[pheno], 2) for pheno in b_closure]
+        ))
+        return numerator / denominator
 
     def jaccard_sim(
             self,

@@ -1,5 +1,6 @@
 from typing import Set, Union, Sequence
 from functools import reduce
+import math
 
 
 # Union types
@@ -16,3 +17,7 @@ def mean(values: Sequence[Num]) -> float:
 
 def sum(values: Sequence[Num]) -> Num:
     return reduce(lambda x,y: x+y, values)
+
+
+def information_content(frequency: Num) -> float:
+    return math.log2(frequency)
