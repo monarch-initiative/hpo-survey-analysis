@@ -1,4 +1,4 @@
-from typing import Set, Union, Sequence, Dict, Optional
+from typing import Set, Union, Iterable, Dict, Optional
 from itertools import chain
 from phenom.utils import owl_utils
 from phenom.math import math
@@ -45,15 +45,18 @@ def jac_ic_geomean(
 
 
 def get_profile_closure(
-        profile: Sequence[str],
+        profile: Iterable[str],
         graph: Graph,
         root: str,
-        predicate: Optional[URIRef] = RDFS['subClassOf']) -> Set[str]:
+        predicate: Optional[URIRef] = RDFS['subClassOf'],
+        negative: Optional[bool] = False) -> Set[str]:
     """
     Given a list of phenotypes, get the reflexive closure for each phenotype
     stored in a single set.  This can be used for jaccard similarity or
     simGIC
     """
     return set(chain.from_iterable(
-        [owl_utils.get_closure(graph, pheno, predicate, root) for pheno in profile])
+        [owl_utils.get_closure(
+            graph, pheno, predicate, root, reflexive=True, negative=negative)
+         for pheno in profile])
     )

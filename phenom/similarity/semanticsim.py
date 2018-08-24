@@ -1,4 +1,4 @@
-from typing import Sequence, Dict, List, Union, Optional
+from typing import Iterable, Dict, List, Union, Optional
 from enum import Enum
 from rdflib import Graph, URIRef, RDFS
 from phenom.similarity import metric
@@ -36,8 +36,8 @@ class SemanticSim():
 
     def sim_gic(
             self,
-            profile_a: Sequence[str],
-            profile_b: Sequence[str],
+            profile_a: Iterable[str],
+            profile_b: Iterable[str],
             predicate: Optional[URIRef] = RDFS['subClassOf']) -> float:
         """
         Groupwise resnik similarity:
@@ -46,6 +46,10 @@ class SemanticSim():
         https://bmcbioinformatics.biomedcentral.com/track/
         pdf/10.1186/1471-2105-9-S5-S4
         """
+        # Filter out negative phenotypes
+        profile_a = {pheno for pheno in profile_a if not pheno.startswith("-")}
+        profile_b = {pheno for pheno in profile_b if not pheno.startswith("-")}
+
         a_closure = metric.get_profile_closure(
             profile_a, self.graph, self.root, predicate)
         b_closure = metric.get_profile_closure(
@@ -64,29 +68,85 @@ class SemanticSim():
 
     def cosine_sim(
             self,
-            profile_a: Sequence[str],
-            profile_b: Sequence[str],
+            profile_a: Iterable[str],
+            profile_b: Iterable[str],
+            negative_weight: Optional[Num] = 1,
             predicate: Optional[URIRef] = RDFS['subClassOf']) -> float:
         """
         Implemented as ochai coefficient, or
-        len( A union B) / sqrt(len(A)*len(B))
-
-        :param profile_a:
-        :param profile_b:
-        :return:
+        ( len( A intersect B) + len (-A intersect -B) ) /
+        sqrt( len(A) + len(-A)) * len(B) + len(-B) )
         """
-        pheno_a_set = metric.get_profile_closure(
-            profile_a, self.graph, self.root, predicate)
-        pheno_b_set = metric.get_profile_closure(
-            profile_b, self.graph, self.root, predicate)
-        numerator = len(pheno_a_set.intersection(pheno_b_set))
-        denominator = std_math.sqrt(len(pheno_a_set) * len(pheno_b_set))
+        positive_a_profile = {item for item in profile_a if not item.startswith('-')}
+        negative_a_profile = {item[1:] for item in profile_a if item.startswith('-')}
+
+        positive_b_profile = {item for item in profile_b if not item.startswith('-')}
+        negative_b_profile = {item[1:] for item in profile_b if item.startswith('-')}
+
+        pos_a_closure = metric.get_profile_closure(
+            positive_a_profile, self.graph, self.root, predicate)
+        pos_b_closure = metric.get_profile_closure(
+            positive_b_profile, self.graph, self.root, predicate)
+
+        neg_a_closure = {"-{}".format(item)
+                              for item in metric.get_profile_closure(
+            negative_a_profile, self.graph, self.root, predicate, negative=True)
+        }
+
+        neg_b_closure = {"-{}".format(item)
+                              for item in metric.get_profile_closure(
+            negative_b_profile, self.graph, self.root, predicate, negative=True)
+        }
+
+        pos_intersect_dot_product = reduce (
+            lambda x, y: x + y,
+            [std_math.pow(1, 2)
+             for item in pos_a_closure.intersection(pos_b_closure)],
+            0
+        )
+
+        neg_intersect_dot_product = reduce(
+            lambda x, y: x + y,
+            [std_math.pow(1 * negative_weight, 2)
+             for item in neg_a_closure.intersection(neg_b_closure)],
+            0
+        )
+
+        a_square_dot_product = std_math.sqrt(
+            reduce(
+                lambda x, y: x + y,
+                [std_math.pow(1, 2) for item in pos_a_closure],
+                0
+            ) +
+            reduce(
+                lambda x, y: x + y,
+                [std_math.pow(1 * negative_weight, 2) for item in neg_a_closure],
+                0
+            )
+        )
+
+        b_square_dot_product = std_math.sqrt(
+            reduce(
+                lambda x, y: x + y,
+                [std_math.pow(1, 2) for item in pos_b_closure],
+                0
+            ) +
+            reduce(
+                lambda x, y: x + y,
+                [std_math.pow(1 * negative_weight, 2) for item in neg_b_closure],
+                0
+            )
+        )
+
+        numerator = pos_intersect_dot_product + neg_intersect_dot_product
+        denominator = a_square_dot_product * b_square_dot_product
+
         return numerator / denominator
 
     def sim_gicosine(
             self,
-            profile_a: Sequence[str],
-            profile_b: Sequence[str],
+            profile_a: Iterable[str],
+            profile_b: Iterable[str],
             predicate: Optional[URIRef] = RDFS['subClassOf']) -> float:
         """
         simGICosine
@@ -94,13 +154,18 @@ class SemanticSim():
         present/absent, we use vectors of information content values
         for present classes, and 0 for absent classes
         """
+        # Filter out negative phenotypes
+        profile_a = {pheno for pheno in profile_a if not pheno.startswith("-")}
+        profile_b = {pheno for pheno in profile_b if not pheno.startswith("-")}
+
         a_closure = metric.get_profile_closure(
             profile_a, self.graph, self.root, predicate)
         b_closure = metric.get_profile_closure(
             profile_b, self.graph, self.root, predicate)
         numerator = reduce(
             lambda x, y: x + y,
-            [std_math.pow(self.ic_map[pheno], 2) for pheno in a_closure.intersection(b_closure)]
+            [std_math.pow(self.ic_map[pheno], 2)
+             for pheno in a_closure.intersection(b_closure)]
         )
         denominator = std_math.sqrt(reduce(
             lambda x, y: x + y,
@@ -113,12 +178,17 @@ class SemanticSim():
 
     def jaccard_sim(
             self,
-            profile_a: Sequence[str],
-            profile_b: Sequence[str],
+            profile_a: Iterable[str],
+            profile_b: Iterable[str],
             predicate: Optional[URIRef] = RDFS['subClassOf']) -> float:
         """
         Groupwise jaccard similarty
+        Negative phenotypes must be prefixed with a '-'
         """
+        # Filter out negative phenotypes
+        profile_a = {pheno for pheno in profile_a if not pheno.startswith("-")}
+        profile_b = {pheno for pheno in profile_b if not pheno.startswith("-")}
+
         pheno_a_set = metric.get_profile_closure(
             profile_a, self.graph, self.root, predicate)
         pheno_b_set = metric.get_profile_closure(
@@ -128,8 +198,8 @@ class SemanticSim():
 
     def resnik_sim(
             self,
-            profile_a: Sequence[str],
-            profile_b: Sequence[str],
+            profile_a: Iterable[str],
+            profile_b: Iterable[str],
             matrix_metric: Union[MatrixMetric, str, None] = MatrixMetric.BMA,
             is_symmetric: Optional[bool]=False,
             is_normalized: Optional[bool]=False) -> float:
@@ -149,6 +219,10 @@ class SemanticSim():
         :return: resnik score, a float between 0-MaxIC in cache,
                  if normalized a float between 0-1
         """
+        # Filter out negative phenotypes
+        profile_a = {pheno for pheno in profile_a if not pheno.startswith("-")}
+        profile_b = {pheno for pheno in profile_b if not pheno.startswith("-")}
+
         if not isinstance(matrix_metric, MatrixMetric):
             matrix_metric = MatrixMetric(matrix_metric.lower())
 
@@ -167,8 +241,8 @@ class SemanticSim():
 
     def _compute_resnik_score(
             self,
-            profile_a: Sequence[str],
-            profile_b: Sequence[str],
+            profile_a: Iterable[str],
+            profile_b: Iterable[str],
             matrix_metric: MatrixMetric,
             is_normalized: bool = False)-> float:
 
@@ -206,8 +280,8 @@ class SemanticSim():
 
     def phenodigm_compare(
             self,
-            profile_a: Sequence[str],
-            profile_b: Sequence[str],
+            profile_a: Iterable[str],
+            profile_b: Iterable[str],
             is_symmetric: Optional[bool]=False,
             is_same_species: Optional[bool]=True,
             similarity_type: Union[PairwiseSim, str, None]= PairwiseSim.GEOMETRIC
@@ -223,6 +297,10 @@ class SemanticSim():
         The first is the metric used in the published algorithm, the second
         is used in the owltools OWLTools-Sim package
         """
+        # Filter out negative phenotypes
+        profile_a = {pheno for pheno in profile_a if not pheno.startswith("-")}
+        profile_b = {pheno for pheno in profile_b if not pheno.startswith("-")}
+
         if not isinstance(similarity_type, PairwiseSim):
             similarity_type = PairwiseSim(similarity_type.lower())
 
@@ -256,8 +334,8 @@ class SemanticSim():
 
     def _get_score_matrix(
             self,
-            profile_a: Sequence[str],
-            profile_b: Sequence[str],
+            profile_a: Iterable[str],
+            profile_b: Iterable[str],
             similarity_type:Union[PairwiseSim, None] = PairwiseSim.IC
     ) -> List[List[float]]:
 
@@ -281,7 +359,7 @@ class SemanticSim():
 
     def _get_optimal_matrix(
             self,
-            profile: Sequence[str],
+            profile: Iterable[str],
             is_same_species: Optional[bool]=True,
             similarity_type: Union[PairwiseSim, None]= PairwiseSim.IC
     ) -> List[List[float]]:

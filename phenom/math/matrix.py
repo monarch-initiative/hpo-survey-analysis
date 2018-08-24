@@ -7,7 +7,7 @@ from itertools import chain
 Num = Union[int, float]
 
 
-def flip_matrix(matrix: List[List]) -> List[List]:
+def flip_matrix(matrix: Sequence[Sequence]) -> List[List]:
     """
     swap rows and columns in a list of lists
     """
