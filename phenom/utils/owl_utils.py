@@ -90,7 +90,7 @@ def get_descendants(
 def get_ancestors(
         graph: Graph,
         node: str,
-        edge: Optional[URIRef] = None,
+        edge: Optional[URIRef] = RDFS['subClassOf'],
         root: Optional[str] = None,
         reflexive: Optional[bool] = True) -> Set[str]:
     nodes = set()

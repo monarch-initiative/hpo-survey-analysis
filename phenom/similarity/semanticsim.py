@@ -73,9 +73,16 @@ class SemanticSim():
             negative_weight: Optional[Num] = 1,
             predicate: Optional[URIRef] = RDFS['subClassOf']) -> float:
         """
-        Implemented as ochai coefficient, or
-        ( len( A intersect B) + len (-A intersect -B) ) /
-        sqrt( len(A) + len(-A)) * len(B) + len(-B) )
+        Cosine similarity
+        Profiles are treated as vectors of numbers between 0-1:
+        1: Phenotype present
+        0: Absent (no information)
+        1 * negative weight: Negated phenotypes
+
+        Inferred phenotypes are computed as parent classes for positive phenotypes
+        and child classes for negative phenotypes.  Typically we do not want to
+        weight negative phenotypes as high as positive phenotypes.  A weight between
+        .01-.1 may be desirable
         """
         positive_a_profile = {item for item in profile_a if not item.startswith('-')}
         negative_a_profile = {item[1:] for item in profile_a if item.startswith('-')}

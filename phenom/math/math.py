@@ -16,4 +16,8 @@ def mean(values: Iterable[Num]) -> float:
 
 
 def information_content(frequency: Num) -> float:
-    return math.log2(frequency)
+    if frequency == 0 or frequency == 1:
+        ic = float(0)
+    else:
+        ic = -(math.log2(frequency))
+    return ic
