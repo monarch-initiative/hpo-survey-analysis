@@ -127,27 +127,28 @@ def _process_hpo_data(url: str) -> Dict[str, Set[str]]:
 
     for line in mondo_merged_lines:
         key = "{}-{}".format(line[0], line[1])
-        values = (line[2], line[3], line[4])
+        values = [line[2], line[3], line[4]]
         if key in disease_info and disease_info[key] != values:
             logger.warning("Metadata for {} and {} mismatch: {} vs {}".format(
                 line[0], line[1], values, disease_info[key])
             )
-            # attempt to merge
+            # attempt to merge by collapsing freq, onset, severity
+            # that is empty in one disease but not another
+            # conflicts will defer to the disease first inserted
+            #
+            # Note in python this is a copy of a reference
+            # so mutating changes both
             merged_disease_info = disease_info[key]
             for index, val in enumerate(values):
-                if val == disease_info[key][index]:
+                if val == disease_info[key][index] \
+                        or val == '' and disease_info[key][index] != '':
                     continue
-                elif val == '' and disease_info[key][index] != '':
-                    merged_disease_info = disease_info[key][index]
                 elif val != '' and disease_info[key][index] == '':
-                    merged_disease_info = val
+                    merged_disease_info[index] = val
                 else:
-                    logger.warning("Cannot merge {} and {}".format(
-                        values, disease_info[key])
+                    logger.warning("Cannot merge {} and {} for {}".format(
+                        values, disease_info[key], line[0])
                     )
-                    merged_disease_info = disease_info[key]
-                    break
-            disease_info[key] = merged_disease_info
         else:
             disease_info[key] = values
 

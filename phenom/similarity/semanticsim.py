@@ -5,6 +5,7 @@ from phenom.similarity import metric
 from phenom.math import matrix, math
 import math as std_math
 from functools import reduce
+import numpy as np
 
 
 # Union types
@@ -70,6 +71,7 @@ class SemanticSim():
             self,
             profile_a: Iterable[str],
             profile_b: Iterable[str],
+            ic_weighted: Optional[bool] = False,
             negative_weight: Optional[Num] = 1,
             predicate: Optional[URIRef] = RDFS['subClassOf']) -> float:
         """
@@ -79,11 +81,21 @@ class SemanticSim():
         0: Absent (no information)
         1 * negative weight: Negated phenotypes
 
+        if ic_weighted is true the attributes become vectors
+        of information content scores
+
         Inferred phenotypes are computed as parent classes for positive phenotypes
         and child classes for negative phenotypes.  Typically we do not want to
         weight negative phenotypes as high as positive phenotypes.  A weight between
         .01-.1 may be desirable
         """
+        def score(term):
+            if ic_weighted:
+                attribute = self.ic_map[term]
+            else:
+                attribute = 1
+            return attribute
+
         positive_a_profile = {item for item in profile_a if not item.startswith('-')}
         negative_a_profile = {item[1:] for item in profile_a if item.startswith('-')}
 
@@ -107,14 +119,14 @@ class SemanticSim():
 
         pos_intersect_dot_product = reduce (
             lambda x, y: x + y,
-            [std_math.pow(1, 2)
+            [std_math.pow(score(item), 2)
              for item in pos_a_closure.intersection(pos_b_closure)],
             0
         )
 
         neg_intersect_dot_product = reduce(
             lambda x, y: x + y,
-            [std_math.pow(1 * negative_weight, 2)
+            [std_math.pow(score(item) * negative_weight, 2)
              for item in neg_a_closure.intersection(neg_b_closure)],
             0
         )
@@ -122,12 +134,13 @@ class SemanticSim():
         a_square_dot_product = std_math.sqrt(
             reduce(
                 lambda x, y: x + y,
-                [std_math.pow(1, 2) for item in pos_a_closure],
+                [std_math.pow(score(item), 2) for item in pos_a_closure],
                 0
             ) +
             reduce(
                 lambda x, y: x + y,
-                [std_math.pow(1 * negative_weight, 2) for item in neg_a_closure],
+                [std_math.pow(score(item) * negative_weight, 2)
+                 for item in neg_a_closure],
                 0
             )
         )
@@ -135,12 +148,13 @@ class SemanticSim():
         b_square_dot_product = std_math.sqrt(
             reduce(
                 lambda x, y: x + y,
-                [std_math.pow(1, 2) for item in pos_b_closure],
+                [std_math.pow(score(item), 2) for item in pos_b_closure],
                 0
             ) +
             reduce(
                 lambda x, y: x + y,
-                [std_math.pow(1 * negative_weight, 2) for item in neg_b_closure],
+                [std_math.pow(score(item) * negative_weight, 2)
+                 for item in neg_b_closure],
                 0
             )
         )
@@ -150,17 +164,11 @@ class SemanticSim():
 
         return numerator / denominator
 
-    def sim_gicosine(
+    def euclidean_distance(
             self,
             profile_a: Iterable[str],
             profile_b: Iterable[str],
             predicate: Optional[URIRef] = RDFS['subClassOf']) -> float:
-        """
-        simGICosine
-        Cosine similarity where instead of vectors of 0 and 1 for
-        present/absent, we use vectors of information content values
-        for present classes, and 0 for absent classes
-        """
         # Filter out negative phenotypes
         profile_a = {pheno for pheno in profile_a if not pheno.startswith("-")}
         profile_b = {pheno for pheno in profile_b if not pheno.startswith("-")}
@@ -169,19 +177,16 @@ class SemanticSim():
             profile_a, self.graph, self.root, predicate)
         b_closure = metric.get_profile_closure(
             profile_b, self.graph, self.root, predicate)
-        numerator = reduce(
-            lambda x, y: x + y,
-            [std_math.pow(self.ic_map[pheno], 2)
-             for pheno in a_closure.intersection(b_closure)]
-        )
-        denominator = std_math.sqrt(reduce(
-            lambda x, y: x + y,
-            [std_math.pow(self.ic_map[pheno], 2) for pheno in a_closure]
-        )) * std_math.sqrt(reduce(
-            lambda x, y: x + y,
-            [std_math.pow(self.ic_map[pheno], 2) for pheno in b_closure]
-        ))
-        return numerator / denominator
+
+        all_phenotypes = a_closure.union(b_closure)
+
+        a_vector = np.array([self.ic_map[item] if
+                               item in a_closure else 0 for item in all_phenotypes])
+        b_vector = np.array([self.ic_map[item] if
+                               item in b_closure else 0 for item in all_phenotypes])
+
+        return np.linalg.norm(a_vector - b_vector)
+
 
     def jaccard_sim(
             self,

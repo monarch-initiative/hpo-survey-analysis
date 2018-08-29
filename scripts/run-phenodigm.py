@@ -1,11 +1,11 @@
 from phenom.similarity.semanticsim import SemanticSim
 from rdflib import Graph
 
-pheno_profile1 = ["HP:0001595", "HP:0002360", "-HP:0002814"]
-pheno_profile2 = ["HP:0002219", "HP:0002360", "-HP:0007340"]
+#pheno_profile1 = ["HP:0001595", "HP:0002360", "-HP:0002814"]
+#pheno_profile2 = ["HP:0002219", "HP:0002360", "-HP:0007340"]
 
-#pheno_profile1 = ["HP:0001595", "HP:0002360"]
-#pheno_profile2 = ["HP:0002219", "HP:0002360"]
+pheno_profile1 = ["HP:0001595", "HP:0002360"]
+pheno_profile2 = ["HP:0002219", "HP:0002360"]
 
 
 hp_graph = Graph()
@@ -39,5 +39,8 @@ print("resnik sim symmetric norm max: ", sem_sim.resnik_sim(
     pheno_profile1, pheno_profile2, matrix_metric='max', is_normalized=True, is_symmetric=True))
 print("cosine sim: ", sem_sim.cosine_sim(pheno_profile1, pheno_profile2, negative_weight=.05))
 print("cosine sim: ", sem_sim.cosine_sim(pheno_profile1, pheno_profile2, negative_weight=.01))
-print("cosine sim weighted: ", sem_sim.sim_gicosine(pheno_profile1, pheno_profile2))
+print("cosine sim weighted: ", sem_sim.cosine_sim(pheno_profile1, pheno_profile2, ic_weighted=True))
+print("euclidean distance: ", sem_sim.euclidean_distance(pheno_profile1, pheno_profile2))
+
+
 
