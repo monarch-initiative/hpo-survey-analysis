@@ -24,7 +24,6 @@ sem_sim = SemanticSim(hp_graph, root, ic_map)
 sem_dist = SemanticDist(hp_graph, root, ic_map)
 
 
-
 print("Symmetric phenodigm: ", sem_sim.phenodigm_compare(
     pheno_profile1, pheno_profile2, is_symmetric=True))
 print("Symmetric owlsim2: ", sem_sim.phenodigm_compare(

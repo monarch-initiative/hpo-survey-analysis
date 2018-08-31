@@ -214,26 +214,6 @@ class SemanticSim():
         if not isinstance(matrix_metric, MatrixMetric):
             matrix_metric = MatrixMetric(matrix_metric.lower())
 
-        resnik_score = 0
-        if is_symmetric:
-            resnik_score = math_utils.mean(
-                [self._compute_resnik_score(profile_a, profile_b,
-                                            matrix_metric, is_normalized),
-                 self._compute_resnik_score(profile_b, profile_a,
-                                            matrix_metric, is_normalized)])
-        else:
-            resnik_score = self._compute_resnik_score(
-                profile_a, profile_b,matrix_metric, is_normalized)
-
-        return resnik_score
-
-    def _compute_resnik_score(
-            self,
-            profile_a: Iterable[str],
-            profile_b: Iterable[str],
-            matrix_metric: MatrixMetric,
-            is_normalized: bool = False)-> float:
-
         sim_measure = PairwiseSim.IC
 
         query_matrix = self._get_score_matrix(
@@ -242,6 +222,32 @@ class SemanticSim():
         if is_normalized:
             optimal_matrix = self._get_optimal_matrix(
                 profile_a, sim_measure=sim_measure)
+        else:
+            optimal_matrix = None
+
+        resnik_score = 0
+        if is_symmetric:
+            b2a_matrix = matrix.flip_matrix(query_matrix)
+            optimal_b_matrix = self._get_optimal_matrix(
+                profile_b, sim_measure=sim_measure)
+            resnik_score = math_utils.mean(
+                [self._compute_resnik_score(
+                    query_matrix, optimal_matrix, matrix_metric),
+                 self._compute_resnik_score(
+                     b2a_matrix, optimal_b_matrix, matrix_metric)])
+        else:
+            resnik_score = self._compute_resnik_score(
+                query_matrix, optimal_matrix, matrix_metric)
+
+        return resnik_score
+
+    def _compute_resnik_score(
+            self,
+            query_matrix: List[List[float]],
+            optimal_matrix: Optional[List[List[float]]] = None,
+            matrix_metric: Optional[MatrixMetric] = MatrixMetric.BMA )-> float:
+
+        is_normalized = True if optimal_matrix else False
 
         resnik_score = 0
 

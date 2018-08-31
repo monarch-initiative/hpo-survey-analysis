@@ -12,10 +12,10 @@ such as scigraph, owlsim, solr, and the monarch app
 """
 
 # Globals and Constants
-SCIGRAPH_URL =    'https://scigraph-ontology-dev.monarchinitiative.org/scigraph'
-OWLSIM_URL =      'https://monarchinitiative.org/owlsim/'
-MONARCH_SCORE =   'https://monarchinitiative.org/score'
-MONARCH_ASSOC =   'https://solr.monarchinitiative.org/solr/golr/select'
+SCIGRAPH_URL  = 'https://scigraph-ontology-dev.monarchinitiative.org/scigraph'
+OWLSIM_URL    = 'https://monarchinitiative.org/owlsim/'
+MONARCH_SCORE = 'https://monarchinitiative.org/score'
+MONARCH_ASSOC = 'https://solr.monarchinitiative.org/solr/golr/select'
 
 session = requests.Session()
 adapter = requests.adapters.HTTPAdapter(max_retries=10)

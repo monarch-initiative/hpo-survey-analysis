@@ -7,7 +7,7 @@ from prefixcommons import contract_uri, expand_uri
 def get_closure(
         graph: Graph,
         node: str,
-        edge: Optional[URIRef]=None,
+        edge: Optional[URIRef]=RDFS['subClassOf'],
         root: Optional[str]=None,
         reflexive: Optional[bool] = True,
         negative: Optional[bool] = False) -> Set[str]:
