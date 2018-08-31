@@ -4,7 +4,7 @@ import requests
 from contextlib import closing
 from phenom import monarch
 from phenom.utils import owl_utils
-from phenom.math import math
+from phenom.math import math_utils
 from rdflib import Graph
 import logging
 import argparse
@@ -85,7 +85,7 @@ def main():
     for phenotype, annot_count in pheno_annotations.items():
         output_file.write("{}\t{}\n".format(
             phenotype,
-            math.information_content(annot_count/explicit_annotations)
+            math_utils.information_content(annot_count / explicit_annotations)
         ))
 
 

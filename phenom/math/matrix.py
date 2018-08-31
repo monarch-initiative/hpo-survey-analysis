@@ -1,5 +1,5 @@
 from typing import Union, Sequence, List
-from phenom.math import math
+from phenom.math import math_utils
 from itertools import chain
 
 
@@ -28,14 +28,20 @@ def bma_score(matrix: Sequence[Sequence[Num]]) -> float:
     """
     best max average score
     """
-    return math.mean([max(row) for row in matrix])
+    return math_utils.mean([max(row) for row in matrix])
+
+def best_min_avg(matrix: Sequence[Sequence[Num]]) -> float:
+    """
+    best min average score
+    """
+    return math_utils.mean([min(row) for row in matrix])
 
 
 def avg_score(matrix: Sequence[Sequence[Num]]) -> float:
     """
     average of every value in the matrix
     """
-    return math.mean(list(chain.from_iterable(matrix)))
+    return math_utils.mean(list(chain.from_iterable(matrix)))
 
 
 def max_percentage_score(

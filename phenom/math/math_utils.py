@@ -12,7 +12,7 @@ def geometric_mean(values: Iterable[Num]) -> float:
 
 
 def mean(values: Iterable[Num]) -> float:
-    return reduce(lambda x,y: x+y, values)/(len(values))
+    return sum(values)/(len(values))
 
 
 def information_content(frequency: Num) -> float:

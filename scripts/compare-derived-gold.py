@@ -1,5 +1,5 @@
 from phenom import monarch
-from phenom.similarity.semanticsim import SemanticSim
+from phenom.similarity.semantic_sim import SemanticSim
 from phenom.utils import owl_utils
 import argparse
 import logging

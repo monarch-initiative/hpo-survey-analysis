@@ -2,8 +2,8 @@ from typing import Iterable, Dict, List, Union, Optional
 from enum import Enum
 from rdflib import Graph, URIRef, RDFS
 from phenom.similarity import metric
-from phenom.math import matrix, math
-import math as std_math
+from phenom.math import matrix, math_utils
+import math
 from functools import reduce
 import numpy as np
 
@@ -119,41 +119,41 @@ class SemanticSim():
 
         pos_intersect_dot_product = reduce (
             lambda x, y: x + y,
-            [std_math.pow(score(item), 2)
+            [math.pow(score(item), 2)
              for item in pos_a_closure.intersection(pos_b_closure)],
             0
         )
 
         neg_intersect_dot_product = reduce(
             lambda x, y: x + y,
-            [std_math.pow(score(item) * negative_weight, 2)
+            [math.pow(score(item) * negative_weight, 2)
              for item in neg_a_closure.intersection(neg_b_closure)],
             0
         )
 
-        a_square_dot_product = std_math.sqrt(
+        a_square_dot_product = math.sqrt(
             reduce(
                 lambda x, y: x + y,
-                [std_math.pow(score(item), 2) for item in pos_a_closure],
+                [math.pow(score(item), 2) for item in pos_a_closure],
                 0
             ) +
             reduce(
                 lambda x, y: x + y,
-                [std_math.pow(score(item) * negative_weight, 2)
+                [math.pow(score(item) * negative_weight, 2)
                  for item in neg_a_closure],
                 0
             )
         )
 
-        b_square_dot_product = std_math.sqrt(
+        b_square_dot_product = math.sqrt(
             reduce(
                 lambda x, y: x + y,
-                [std_math.pow(score(item), 2) for item in pos_b_closure],
+                [math.pow(score(item), 2) for item in pos_b_closure],
                 0
             ) +
             reduce(
                 lambda x, y: x + y,
-                [std_math.pow(score(item) * negative_weight, 2)
+                [math.pow(score(item) * negative_weight, 2)
                  for item in neg_b_closure],
                 0
             )
@@ -163,30 +163,6 @@ class SemanticSim():
         denominator = a_square_dot_product * b_square_dot_product
 
         return numerator / denominator
-
-    def euclidean_distance(
-            self,
-            profile_a: Iterable[str],
-            profile_b: Iterable[str],
-            predicate: Optional[URIRef] = RDFS['subClassOf']) -> float:
-        # Filter out negative phenotypes
-        profile_a = {pheno for pheno in profile_a if not pheno.startswith("-")}
-        profile_b = {pheno for pheno in profile_b if not pheno.startswith("-")}
-
-        a_closure = metric.get_profile_closure(
-            profile_a, self.graph, self.root, predicate)
-        b_closure = metric.get_profile_closure(
-            profile_b, self.graph, self.root, predicate)
-
-        all_phenotypes = a_closure.union(b_closure)
-
-        a_vector = np.array([self.ic_map[item] if
-                               item in a_closure else 0 for item in all_phenotypes])
-        b_vector = np.array([self.ic_map[item] if
-                               item in b_closure else 0 for item in all_phenotypes])
-
-        return np.linalg.norm(a_vector - b_vector)
-
 
     def jaccard_sim(
             self,
@@ -240,7 +216,7 @@ class SemanticSim():
 
         resnik_score = 0
         if is_symmetric:
-            resnik_score = math.mean(
+            resnik_score = math_utils.mean(
                 [self._compute_resnik_score(profile_a, profile_b,
                                             matrix_metric, is_normalized),
                  self._compute_resnik_score(profile_b, profile_a,
@@ -258,14 +234,14 @@ class SemanticSim():
             matrix_metric: MatrixMetric,
             is_normalized: bool = False)-> float:
 
-        similarity_type = PairwiseSim.IC
+        sim_measure = PairwiseSim.IC
 
         query_matrix = self._get_score_matrix(
-            profile_a, profile_b, similarity_type)
+            profile_a, profile_b, sim_measure)
 
         if is_normalized:
             optimal_matrix = self._get_optimal_matrix(
-                profile_a, similarity_type=similarity_type)
+                profile_a, sim_measure=sim_measure)
 
         resnik_score = 0
 
@@ -296,7 +272,7 @@ class SemanticSim():
             profile_b: Iterable[str],
             is_symmetric: Optional[bool]=False,
             is_same_species: Optional[bool]=True,
-            similarity_type: Union[PairwiseSim, str, None]= PairwiseSim.GEOMETRIC
+            sim_measure: Union[PairwiseSim, str, None]= PairwiseSim.GEOMETRIC
     ) -> float:
         """
         Phenodigm algorithm:
@@ -313,22 +289,21 @@ class SemanticSim():
         profile_a = {pheno for pheno in profile_a if not pheno.startswith("-")}
         profile_b = {pheno for pheno in profile_b if not pheno.startswith("-")}
 
-        if not isinstance(similarity_type, PairwiseSim):
-            similarity_type = PairwiseSim(similarity_type.lower())
+        if not isinstance(sim_measure, PairwiseSim):
+            sim_measure = PairwiseSim(sim_measure.lower())
 
-        query_matrix = self._get_score_matrix(
-            profile_a, profile_b, similarity_type)
+        query_matrix = self._get_score_matrix(profile_a, profile_b, sim_measure)
         if is_same_species:
             optimal_matrix = self._get_optimal_matrix(
-                profile_a, is_same_species, similarity_type)
+                profile_a, is_same_species, sim_measure)
         else:
             raise NotImplementedError
 
         if is_symmetric:
             b2a_matrix = matrix.flip_matrix(query_matrix)
             optimal_b_matrix = self._get_optimal_matrix(
-                profile_b, is_same_species, similarity_type)
-            score = math.mean(
+                profile_b, is_same_species, sim_measure)
+            score = math_utils.mean(
                 [self.compute_phenodigm_score(query_matrix, optimal_matrix),
                  self.compute_phenodigm_score(b2a_matrix, optimal_b_matrix)])
         else:
@@ -340,7 +315,7 @@ class SemanticSim():
     def compute_phenodigm_score(
             query_matrix: List[List[float]],
             optimal_matrix: List[List[float]]) -> float:
-        return 100 * math.mean(
+        return 100 * math_utils.mean(
             [matrix.max_percentage_score(query_matrix, optimal_matrix),
              matrix.bma_percentage_score(query_matrix, optimal_matrix)])
 
@@ -348,14 +323,14 @@ class SemanticSim():
             self,
             profile_a: Iterable[str],
             profile_b: Iterable[str],
-            similarity_type:Union[PairwiseSim, None] = PairwiseSim.IC
+            sim_measure: Union[PairwiseSim, None] = PairwiseSim.IC
     ) -> List[List[float]]:
 
         score_matrix = [[]]
 
-        if similarity_type == PairwiseSim.GEOMETRIC:
+        if sim_measure == PairwiseSim.GEOMETRIC:
             sim_fn = metric.jac_ic_geomean
-        elif similarity_type == PairwiseSim.IC:
+        elif sim_measure == PairwiseSim.IC:
             sim_fn = metric.get_mica_ic
         else:
             raise NotImplementedError
@@ -373,7 +348,7 @@ class SemanticSim():
             self,
             profile: Iterable[str],
             is_same_species: Optional[bool]=True,
-            similarity_type: Union[PairwiseSim, None]= PairwiseSim.IC
+            sim_measure: Union[PairwiseSim, None]= PairwiseSim.IC
     ) -> List[List[float]]:
         """
         Only implemented for same species comparisons
@@ -381,10 +356,10 @@ class SemanticSim():
         score_matrix = []
         if is_same_species:
             for pheno in profile:
-                if similarity_type == PairwiseSim.GEOMETRIC:
+                if sim_measure == PairwiseSim.GEOMETRIC:
                     score_matrix.append(
-                        [math.geometric_mean([1, self.ic_map[pheno]])])
-                elif similarity_type == PairwiseSim.IC:
+                        [math_utils.geometric_mean([1, self.ic_map[pheno]])])
+                elif sim_measure == PairwiseSim.IC:
                     score_matrix.append([self.ic_map[pheno]])
                 else:
                     raise NotImplementedError
