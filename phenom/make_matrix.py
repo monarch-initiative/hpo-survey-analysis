@@ -1,129 +1,129 @@
-from phenom import monarch
 from phenom.similarity.semantic_sim import SemanticSim
-from phenom.utils import owl_utils
+from phenom.similarity.semantic_dist import SemanticDist
 import argparse
 import logging
 import csv
 from rdflib import Graph
-from typing import Dict, List
-from collections import deque
+from typing import Dict, List, Tuple, Any
+from itertools import combinations
 import multiprocessing
-from multiprocessing import Process, Manager
+from multiprocessing import Process, Queue
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def get_score(query_profile, diseases, scores):
-    sem_sim = SemanticSim(hpo, root, ic_map)
-    for disease in diseases:
-        pheno_profile = gold_standard[disease]
-        score = 1 - sem_sim.resnik_sim(
-            query_profile, pheno_profile, is_normalized=True, is_symmetric=True)
-        scores.append((disease, score))
-    return scores
-
-
-parser = argparse.ArgumentParser(
-    description='Given a subset of HPO terms and diseases, generates '
-                'derived annotations from the HPO disease to phenotype annotations')
-parser.add_argument('--phenotypes', '-ph', type=str, required=False)
-parser.add_argument('--diseases', '-d', type=str, required=True)
-parser.add_argument('--ic_cache', '-ic', type=str, required=True)
-parser.add_argument('--annotations', '-a', type=str, required=True,
+def main():
+    parser = argparse.ArgumentParser(
+        description='Given a subset of HPO terms and diseases, generates '
+                    'derived annotations from the HPO disease to phenotype '
+                    'annotations')
+    parser.add_argument('--phenotypes', '-ph', type=str, required=False)
+    parser.add_argument('--diseases', '-d', type=str, required=True)
+    parser.add_argument('--ic_cache', '-ic', type=str, required=True)
+    parser.add_argument('--annotations', '-a', type=str, required=True,
                     help='Cached gold standard disease phenotype annotations')
-parser.add_argument('--processes', '-p', type=int, required=False,
+    parser.add_argument('--processes', '-p', type=int, required=False,
                     default=int(multiprocessing.cpu_count()/2),
-help='Number of processes to spawn')
+                    help='Number of processes to spawn')
+    parser.add_argument('--output', '-o', type=str, required=False,
+                        help='Location of output file', default="./matrix.csv")
 
-parser.add_argument('--output', '-o', type=str, required=False,
-                    help='Location of output file', default="./matrix.tsv")
+    args = parser.parse_args()
 
-args = parser.parse_args()
+    root = "HP:0000118"
+    hpo = Graph()
+    hpo.parse("http://purl.obolibrary.org/obo/hp.owl", format='xml')
 
+    # I/O
+    disease_fh = open(args.diseases, 'r')
+    ic_fh = open(args.ic_cache, 'r')
+    output = open(args.output, 'w')
+    csv_writer = csv.writer(output, delimiter=',')
+    diseases = disease_fh.read().splitlines()
 
-root = "HP:0000118"
-hpo = Graph()
-hpo.parse("http://purl.obolibrary.org/obo/hp.owl", format='xml')
+    dist_matrix = [[0 for k in range(len(diseases))] for i in range(len(diseases))]
+    ic_map: Dict[str, float] = {}
+    disease2phen: Dict[str, List[str]] = {}
+    disease_map: Dict[str, int] = {}
 
-# I/O
-disease_fh = open(args.diseases, 'r')
-ic_fh = open(args.ic_cache, 'r')
-output = open(args.output, 'w')
-csv_writer = csv.writer(output, delimiter=',')
-diseases = disease_fh.read().splitlines()
+    # create dictionary of diseases and their index
+    index = 0
+    for disease in diseases:
+        disease_map[disease] = index
+        index += 1
 
-ic_map: Dict[str, float] = {}
-gold_standard: Dict[str, List[str]] = {}
+    # Create list of combinations of diseases
+    disease_combos = list(combinations(diseases, 2))
 
-for line in ic_fh.readlines():
-    hpo_id, ic = line.rstrip("\n").split("\t")
-    ic_map[hpo_id] = float(ic)
+    for line in ic_fh.readlines():
+        hpo_id, ic = line.rstrip("\n").split("\t")
+        ic_map[hpo_id] = float(ic)
 
-if args.phenotypes:
-    pheno_fh = open(args.phenotypes, 'r')
-    phenotype_terms = set(pheno_fh.read().splitlines())
-else:
-    phenotype_terms = owl_utils.get_descendants(hpo, root)
+    with open(args.annotations, 'r') as cache_file:
+        reader = csv.reader(cache_file, delimiter='\t', quotechar='\"')
+        for row in reader:
+            if row[0].startswith('#'): continue
+            (mondo_id, phenotype_id) = row[0:2]
+            if mondo_id in disease2phen:
+                disease2phen[mondo_id].append(phenotype_id)
+            else:
+                disease2phen[mondo_id] = [phenotype_id]
 
-# memoize closures
-# doesn't quite work with multiprocessing
-# for terms in phenotype_terms:
-#    owl_utils.get_closure(hpo, terms, root=root)
-
-with open(args.annotations, 'r') as cache_file:
-    reader = csv.reader(cache_file, delimiter='\t', quotechar='\"')
-    for row in reader:
-        if row[0].startswith('#'): continue
-        (mondo_id, phenotype_id) = row[0:2]
-        if mondo_id in gold_standard:
-            gold_standard[mondo_id].append(phenotype_id)
-        else:
-            gold_standard[mondo_id] = [phenotype_id]
-
-gs = gold_standard['MONDO:0000044']
-
-is_first_run = True
-
-for disease_index in range(len(diseases)):
-
-    manager = Manager()
-    scores = manager.list()
     procs = []
-    disease_score: Dict[str, float] = {}
-
-    if not is_first_run:
-        del diseases[0]
-    else:
-        is_first_run = False
-
-    matrix_row = [0 for i in range(disease_index)]
-    query_profile = gold_standard[diseases[disease_index]]
+    queue = Queue()  # create a queue object
+    result_list = []
 
     # Split into chunks depending on args.processes
-    for chunk in [diseases[i::args.processes] for i in range(args.processes)]:
-        proc = Process(target=get_score, args=(query_profile, chunk, scores))
+    for chunk in [disease_combos[i::args.processes] for i in range(args.processes)]:
+        proc = Process(target=get_resnik_sim,
+                       args=(chunk, disease2phen,hpo, root, ic_map, disease_map, queue))
         proc.start()
         procs.append(proc)
+
+    for i in range(args.processes):
+        result_list.extend(queue.get())
 
     for proc in procs:
         proc.join()
 
-    for disease, score in scores:
-        disease_score[disease] = score
+    for dis_a_index, dis_b_index, score in result_list:
+        dist_matrix[dis_a_index][dis_b_index] = score
+        dist_matrix[dis_b_index][dis_a_index] = score
 
-    for disease in diseases:
-        matrix_row.append(disease_score[disease])
+    for row in dist_matrix:
+        csv_writer.writerow(row)
 
-    csv_writer.writerow(matrix_row)
-    if disease_index % 100 == 0:
-        logger.info("Processed {} rows".format(disease_index))
 
-"""
-scores = []
-for disease in diseases:
-    pheno_profile = gold_standard[disease]
-    score = sem_sim.resnik_sim(gs, pheno_profile, is_normalized=True, is_symmetric=True)
-    scores.append(score)
-"""
+def get_resnik_sim(combos, disease2phen, graph, root, ic_map, coordinates, queue):
+    #sem_sim = SemanticSim(graph, root, ic_map)
+    sem_dist = SemanticDist(graph, root, ic_map)
+    result_list: List[Tuple[int,int,Any]] = []
+    for index, combo in enumerate(combos):
+        disease_a, disease_b = combo
+        disease_a_profile = disease2phen[disease_a]
+        disease_b_profile = disease2phen[disease_b]
+        #score = 1 - sem_sim.resnik_sim(
+        #    disease_a_profile, disease_b_profile, is_normalized=True, is_symmetric=True)
+        #score = 1 - sem_sim.cosine_sim(
+        #    disease_a_profile, disease_b_profile, ic_weighted=True)
+        score = sem_dist.euclidean_matrix(disease_a_profile, disease_b_profile)
+        if score == 1 or score == 0:
+            result_list.append((coordinates[disease_a],
+                               coordinates[disease_b],
+                               int(score))
+            )
+        else:
+            result_list.append((coordinates[disease_a],
+                               coordinates[disease_b],
+                               "{:.4f}".format(score))
+            )
 
+        if index % 100000 == 0:
+            logger.info("Processed {} combinations out of {}".format(index, len(combos)))
+
+    queue.put(result_list)
+
+
+if __name__ == "__main__":
+    main()
