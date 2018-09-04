@@ -73,6 +73,7 @@ def main():
     procs = []
     queue = Queue()  # create a queue object
     result_list = []
+    #result_dict = {}
 
     # Split into chunks depending on args.processes
     for chunk in [disease_combos[i::args.processes] for i in range(args.processes)]:
@@ -99,6 +100,7 @@ def get_resnik_sim(combos, disease2phen, graph, root, ic_map, coordinates, queue
     #sem_sim = SemanticSim(graph, root, ic_map)
     sem_dist = SemanticDist(graph, root, ic_map)
     result_list: List[Tuple[int,int,Any]] = []
+    #result_dict = {}
     for index, combo in enumerate(combos):
         disease_a, disease_b = combo
         disease_a_profile = disease2phen[disease_a]
@@ -107,17 +109,19 @@ def get_resnik_sim(combos, disease2phen, graph, root, ic_map, coordinates, queue
         #    disease_a_profile, disease_b_profile, is_normalized=True, is_symmetric=True)
         #score = 1 - sem_sim.cosine_sim(
         #    disease_a_profile, disease_b_profile, ic_weighted=True)
-        score = sem_dist.euclidean_matrix(disease_a_profile, disease_b_profile)
+        score = sem_dist.euclidean_matrix(disease_a_profile, disease_b_profile, distance_measure='jin_conrath')
         if score == 1 or score == 0:
-            result_list.append((coordinates[disease_a],
-                               coordinates[disease_b],
-                               int(score))
-            )
+            result_list.append(
+                (coordinates[disease_a], coordinates[disease_b], int(score)))
+            #result_dict[
+            #    (coordinates[disease_a],coordinates[disease_b])
+            #] = int(score)
         else:
-            result_list.append((coordinates[disease_a],
-                               coordinates[disease_b],
-                               "{:.4f}".format(score))
-            )
+            result_list.append(
+                (coordinates[disease_a], coordinates[disease_b], "{:.4f}".format(score)))
+            #result_dict[
+            #    (coordinates[disease_a], coordinates[disease_b])
+            #] = "{:.4f}".format(score)
 
         if index % 100000 == 0:
             logger.info("Processed {} combinations out of {}".format(index, len(combos)))
