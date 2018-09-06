@@ -46,7 +46,7 @@ def main():
     explicit_annotations = 0
     pheno_annotations: Dict[str, int] = {}
     hp_graph = Graph()
-    hp_graph.parse('http://purl.obolibrary.org/obo/hp.owl', format='xml')
+    hp_graph.parse(HPO_ONTOLOGY, format='xml')
     root = "HP:0000118"
     all_hpo = "HP:0000001"
 

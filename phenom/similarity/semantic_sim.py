@@ -2,6 +2,7 @@ from typing import Iterable, Dict, List, Union, Optional
 from enum import Enum
 from rdflib import Graph, URIRef, RDFS
 from phenom.similarity import metric
+from phenom.utils import owl_utils
 from phenom.math import matrix, math_utils
 import math
 from functools import reduce
@@ -51,9 +52,9 @@ class SemanticSim():
         profile_a = {pheno for pheno in profile_a if not pheno.startswith("-")}
         profile_b = {pheno for pheno in profile_b if not pheno.startswith("-")}
 
-        a_closure = metric.get_profile_closure(
+        a_closure = owl_utils.get_profile_closure(
             profile_a, self.graph, self.root, predicate)
-        b_closure = metric.get_profile_closure(
+        b_closure = owl_utils.get_profile_closure(
             profile_b, self.graph, self.root, predicate)
 
         numerator = reduce(
@@ -102,18 +103,18 @@ class SemanticSim():
         positive_b_profile = {item for item in profile_b if not item.startswith('-')}
         negative_b_profile = {item[1:] for item in profile_b if item.startswith('-')}
 
-        pos_a_closure = metric.get_profile_closure(
+        pos_a_closure = owl_utils.get_profile_closure(
             positive_a_profile, self.graph, self.root, predicate)
-        pos_b_closure = metric.get_profile_closure(
+        pos_b_closure = owl_utils.get_profile_closure(
             positive_b_profile, self.graph, self.root, predicate)
 
         neg_a_closure = {"-{}".format(item)
-                              for item in metric.get_profile_closure(
+                              for item in owl_utils.get_profile_closure(
             negative_a_profile, self.graph, self.root, predicate, negative=True)
         }
 
         neg_b_closure = {"-{}".format(item)
-                              for item in metric.get_profile_closure(
+                              for item in owl_utils.get_profile_closure(
             negative_b_profile, self.graph, self.root, predicate, negative=True)
         }
 
@@ -177,9 +178,9 @@ class SemanticSim():
         profile_a = {pheno for pheno in profile_a if not pheno.startswith("-")}
         profile_b = {pheno for pheno in profile_b if not pheno.startswith("-")}
 
-        pheno_a_set = metric.get_profile_closure(
+        pheno_a_set = owl_utils.get_profile_closure(
             profile_a, self.graph, self.root, predicate)
-        pheno_b_set = metric.get_profile_closure(
+        pheno_b_set = owl_utils.get_profile_closure(
             profile_b, self.graph, self.root, predicate)
 
         return metric.jaccard(pheno_a_set, pheno_b_set)

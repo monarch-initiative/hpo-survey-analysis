@@ -1,7 +1,9 @@
-from typing import Set, List, Optional, Dict, Sequence
+from typing import Set, List, Optional, Dict, Iterable
 from phenom.decorators import memoized
 from rdflib import URIRef, BNode, Literal, Graph, RDFS
 from prefixcommons import contract_uri, expand_uri
+from prefixcommons.curie_util import NoExpansion
+from itertools import chain
 
 
 def get_closure(
@@ -11,18 +13,14 @@ def get_closure(
         root: Optional[str]=None,
         reflexive: Optional[bool] = True,
         negative: Optional[bool] = False) -> Set[str]:
-
-    prefix, reference = node.split(":")
-    reference = int(reference)
-    closure = get_closure_memoized(
-        graph, reference, prefix, edge, root, reflexive, negative)
-    return {"{}:{}".format(prefix, str(node).zfill(7)) for node in closure}
+    return _get_closure(graph, node, edge, root, reflexive, negative)
 
 
+@memoized
 def _get_closure(
         graph: Graph,
         node: str,
-        edge: Optional[URIRef]=None,
+        edge: Optional[URIRef]=RDFS['subClassOf'],
         root: Optional[str]=None,
         reflexive: Optional[bool] = True,
         negative: Optional[bool] = False) -> Set[str]:
@@ -32,20 +30,6 @@ def _get_closure(
     else:
         nodes = get_ancestors(graph, node, edge, root, reflexive)
     return nodes
-
-@memoized
-def get_closure_memoized(
-        graph: Graph,
-        node_id: int,
-        curie_prefix: str,
-        edge: Optional[URIRef]=None,
-        root: Optional[str]=None,
-        reflexive: Optional[bool] = True,
-        negative: Optional[bool] = False) -> List[int]:
-
-    node = "{}:{}".format(curie_prefix, str(node_id).zfill(7))
-    closure = _get_closure(graph, node, edge, root, reflexive, negative)
-    return [int(id.replace("{}:".format(curie_prefix), "")) for id in closure]
 
 
 def get_mica_id(
@@ -95,8 +79,8 @@ def get_ancestors(
         reflexive: Optional[bool] = True) -> Set[str]:
     nodes = set()
     root_seen = {}
-    if node is not None:
-        node = URIRef(expand_uri(node, strict=True))
+    node = URIRef(expand_uri(node, strict=True))
+
     if root is not None:
         root = URIRef(expand_uri(root, strict=True))
         root_seen = {root: 1}
@@ -112,3 +96,40 @@ def get_ancestors(
         nodes.add(contract_uri(str(root), strict=True)[0])
 
     return nodes
+
+
+def get_leaf_nodes(
+        graph: Graph,
+        node: str,
+        edge: Optional[URIRef] = RDFS['subClassOf']) -> Set[str]:
+
+    if not isinstance(node, URIRef):
+        obj = URIRef(expand_uri(node, strict=True))
+    else:
+        obj = node
+
+    subjects = list(graph.subjects(edge, obj))
+    if len(subjects) == 0:
+        yield contract_uri(str(obj), strict=True)[0]
+    else:
+        for subject in subjects:
+            for leaf in get_leaf_nodes(graph, subject, edge):
+                yield leaf
+
+
+def get_profile_closure(
+        profile: Iterable[str],
+        graph: Graph,
+        root: str,
+        predicate: Optional[URIRef] = RDFS['subClassOf'],
+        negative: Optional[bool] = False) -> Set[str]:
+    """
+    Given a list of phenotypes, get the reflexive closure for each phenotype
+    stored in a single set.  This can be used for jaccard similarity or
+    simGIC
+    """
+    return set(chain.from_iterable(
+        [get_closure(
+            graph, pheno, predicate, root, reflexive=True, negative=negative)
+         for pheno in profile])
+    )

@@ -3,6 +3,7 @@ from enum import Enum
 from rdflib import Graph, URIRef, RDFS
 from phenom.similarity import metric
 from phenom.math import matrix, math_utils
+from phenom.utils import owl_utils
 import math
 from functools import reduce
 import numpy as np
@@ -46,9 +47,9 @@ class SemanticDist():
         profile_a = {pheno for pheno in profile_a if not pheno.startswith("-")}
         profile_b = {pheno for pheno in profile_b if not pheno.startswith("-")}
 
-        a_closure = metric.get_profile_closure(
+        a_closure = owl_utils.get_profile_closure(
             profile_a, self.graph, self.root, predicate)
-        b_closure = metric.get_profile_closure(
+        b_closure = owl_utils.get_profile_closure(
             profile_b, self.graph, self.root, predicate)
 
         all_phenotypes = a_closure.union(b_closure)
