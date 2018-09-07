@@ -26,7 +26,7 @@ def _get_closure(
         negative: Optional[bool] = False) -> Set[str]:
     nodes = set()
     if negative:
-        nodes = get_descendants(graph, node, edge)
+        nodes = get_descendants(graph, node, edge, reflexive)
     else:
         nodes = get_ancestors(graph, node, edge, root, reflexive)
     return nodes

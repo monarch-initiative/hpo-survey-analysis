@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 def main():
     """
     Cluster distance matrix with scipy.cluster.hierarchy
+    and evaluate clusters with information content of
+    MONDO classes
     """
     parser = argparse.ArgumentParser(description='description')
     parser.add_argument('--input', '-i', type=str, required=True,
@@ -62,34 +64,42 @@ def main():
         'ward': 'ward',
         'average': 'UPGMA',
         'weighted': 'WPGMA',
-        'centroid': 'centroid'
+        'centroid': 'centroid',
+        'complete': 'complete',
+        'median': 'median'
     }
 
     logger.info("clustering")
-    #Z = linkage(squareform(matrix), 'ward')
+    Z = linkage(squareform(matrix), 'ward')
 
-    #for dist in np.linspace(.1, 1, 91):
-    #    clusters = fcluster(Z, dist, 'distance')
+    for dist in np.linspace(.35, .5, 91):
+        clusters = fcluster(Z, dist, 'distance')
 
-    for meth in clust_meth.keys():
-        Z = linkage(squareform(matrix), meth)
-        clusters = fcluster(Z, 500, 'maxclust')
+    #for meth in clust_meth.keys():
+    #    Z = linkage(squareform(matrix), meth)
+    #    clusters = fcluster(Z, 500, 'maxclust')
 
         cluster_map = {}
+        mica_list = []
+        cluster_sizes = []
+        unclustered = 0
+        poor = 0
+        medium = 0
+        good = 0
+        excellent = 0
+
         for disease_id, cluster_id in zip(labels, clusters):
             try:
                 cluster_map[cluster_id].append(disease_id)
             except KeyError:
                 cluster_map[cluster_id] = [disease_id]
 
-        mica_list = []
-        cluster_sizes = []
         for cluster_id, diseases in cluster_map.items():
             cluster_sizes.append(len(diseases))
             if len(set(diseases).intersection(mondo_skip)) > 0:
                 if len(diseases) == len(set(diseases).intersection(mondo_skip)):
                     logger.warning("Cannot evaluate cluster")
-                    continue
+                    diseases = set(diseases)
                 else:
                     diseases = set(diseases) - mondo_skip
             common_ancestors = set()
@@ -104,18 +114,36 @@ def main():
                     )
             mica = max([ic_map[d] for d in common_ancestors])
             mica_list.append(mica)
+            if mica <= .001:
+                unclustered += len(cluster_map[cluster_id])
+            elif .001 < mica <= 3:
+                poor += len(cluster_map[cluster_id])
+            elif 3 < mica <= 6:
+                medium += len(cluster_map[cluster_id])
+            elif 6 < mica <= 9:
+                good += len(cluster_map[cluster_id])
+            else:
+                excellent += len(cluster_map[cluster_id])
 
         singleton_count = sum([len(v) for k, v in cluster_map.items() if len(v) == 1])
         sizes = [len(v) for k, v in cluster_map.items()]
+
         #output.write("{:.4f}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
-        output.write("{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
-            clust_meth[meth],
+        output.write("{:.4f}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
+            #clust_meth[meth],
+            dist,
+            'ward',
             mean(mica_list),
             median(mica_list),
             len(cluster_map.keys()),
             mean(sizes),
             median(sizes),
-            singleton_count
+            singleton_count,
+            unclustered,
+            poor,
+            medium,
+            good,
+            excellent
         ))
 
 

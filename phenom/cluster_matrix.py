@@ -29,7 +29,7 @@ def main():
     labels = [line.rstrip('\n').split('\t')[0] for line in open(args.label, 'r')]
 
     logger.info("clustering")
-    Z = linkage(squareform(matrix), 'centroid')
+    Z = linkage(squareform(matrix), 'ward')
 
     logger.info("generating flat clusters")
 

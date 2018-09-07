@@ -51,6 +51,17 @@ def get_clique_leader(id):
     return leader
 
 
+def get_label(id):
+    url = SCIGRAPH_URL + '/graph/{}.json'.format(id)
+    sci_request = session.get(url)
+    response = sci_request.json()
+    try:
+       label = response['nodes'][0]['lbl']
+    except IndexError:
+        label = ''
+    return label
+
+
 def get_direct_phenotypes(entity):
     phenotype_list = set()
     disease_label = ""
