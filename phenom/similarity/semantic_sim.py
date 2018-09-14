@@ -68,6 +68,79 @@ class SemanticSim():
 
         return numerator/denominator
 
+    def groupwise_sim_gic(
+            self,
+            profiles: Iterable[Iterable[str]],
+            predicate: Optional[URIRef] = RDFS['subClassOf']) -> float:
+        """
+        Groupwise groupwise resnik similarity
+        assumes no negative phenotypes
+        """
+        # Filter out negative phenotypes
+        profile_union = set()
+        profile_intersection = set()
+
+        is_first = True
+        for profile in profiles:
+            profile_union = profile_union.union(
+                owl_utils.get_profile_closure(
+                    profile, self.graph, self.root, predicate)
+            )
+            if is_first:
+                profile_intersection = owl_utils.get_profile_closure(
+                    profile, self.graph, self.root, predicate
+                )
+                if_first = False
+            else:
+                profile_intersection = profile_intersection.intersection(
+                    owl_utils.get_profile_closure(
+                        profile, self.graph, self.root, predicate
+                    )
+                )
+
+        numerator = reduce(
+            lambda x, y: x + y,
+            [self.ic_map[pheno] for pheno in profile_intersection]
+        )
+        denominator = reduce(
+            lambda x, y: x + y,
+            [self.ic_map[pheno] for pheno in profile_union]
+        )
+
+        return numerator/denominator
+
+    def groupwise_jaccard(
+            self,
+            profiles: Iterable[Iterable[str]],
+            predicate: Optional[URIRef] = RDFS['subClassOf']) -> float:
+        """
+        Groupwise groupwise resnik similarity
+        assumes no negative phenotypes
+        """
+        # Filter out negative phenotypes
+        profile_union = set()
+        profile_intersection = set()
+
+        is_first = True
+        for profile in profiles:
+            profile_union = profile_union.union(
+                owl_utils.get_profile_closure(
+                    profile, self.graph, self.root, predicate)
+            )
+            if is_first:
+                profile_intersection = owl_utils.get_profile_closure(
+                    profile, self.graph, self.root, predicate
+                )
+                if_first = False
+            else:
+                profile_intersection = profile_intersection.intersection(
+                    owl_utils.get_profile_closure(
+                        profile, self.graph, self.root, predicate
+                    )
+                )
+
+        return len(profile_intersection)/len(profile_union)
+
     def cosine_sim(
             self,
             profile_a: Iterable[str],

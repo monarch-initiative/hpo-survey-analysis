@@ -12,6 +12,9 @@ def geometric_mean(values: Iterable[Num]) -> float:
 
 
 def mean(values: Iterable[Num]) -> float:
+    """
+    For testing, use statistics.mean instead
+    """
     return sum(values)/(len(values))
 
 
@@ -19,5 +22,5 @@ def information_content(frequency: Num) -> float:
     if frequency == 0 or frequency == 1:
         ic = float(0)
     else:
-        ic = -(math.log2(frequency))
+        ic = -(math.log(frequency))
     return ic

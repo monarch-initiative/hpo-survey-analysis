@@ -6,7 +6,9 @@ from typing import Dict
 import logging
 from scipy.spatial.distance import squareform
 from phenom.utils import owl_utils
+from phenom.similarity.semantic_sim import SemanticSim
 from rdflib import Graph
+import csv
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -25,6 +27,8 @@ def main():
     parser.add_argument('--label', '-l', type=str, required=True,
                         help='Location of id-label mapping file')
     parser.add_argument('--ic_cache', '-ic', type=str, required=True)
+    parser.add_argument('--annotations', '-a', type=str, required=True,
+                        help='Cached gold standard disease phenotype annotations')
     parser.add_argument('--output', '-o', required=False, help='output file')
     args = parser.parse_args()
 
@@ -38,6 +42,7 @@ def main():
                  "num_clusters\tmean_mem\tmedian_mem\tsingletons\n")
 
     ic_map: Dict[str, float] = {}
+    disease2phen = {}
 
     for line in ic_fh.readlines():
         hpo_id, ic = line.rstrip("\n").split("\t")
@@ -47,10 +52,26 @@ def main():
 
     mondo_graph = Graph()
 
-    logger.info("loading mondo")
+    #logger.info("loading mondo")
     # Previous cache made with 2018-08-03 version of mondo
-    mondo_graph.parse("/home/kshefchek/git/mondo-2018-08-03/src/ontology/reasoned.owl", format='xml')
-    root = "MONDO:0000001"
+    #mondo_graph.parse("/home/kshefchek/git/mondo-2018-08-03/src/ontology/reasoned.owl", format='xml')
+    #root = "MONDO:0000001"
+
+    logger.info("loading hpo")
+    root = "HP:0000118"
+    hpo = Graph()
+    hpo.parse("http://purl.obolibrary.org/obo/hp.owl", format='xml')
+    sem_sim = SemanticSim(hpo, root, ic_map)
+
+    with open(args.annotations, 'r') as cache_file:
+        reader = csv.reader(cache_file, delimiter='\t', quotechar='\"')
+        for row in reader:
+            if row[0].startswith('#'): continue
+            (mondo_id, phenotype_id) = row[0:2]
+            if mondo_id in disease2phen:
+                disease2phen[mondo_id].append(phenotype_id)
+            else:
+                disease2phen[mondo_id] = [phenotype_id]
 
     mondo_skip = {
         'MONDO:0023807',
@@ -72,7 +93,7 @@ def main():
     logger.info("clustering")
     Z = linkage(squareform(matrix), 'ward')
 
-    for dist in np.linspace(.35, .5, 91):
+    for dist in np.linspace(50, 180, 400):
         clusters = fcluster(Z, dist, 'distance')
 
     #for meth in clust_meth.keys():
@@ -80,13 +101,10 @@ def main():
     #    clusters = fcluster(Z, 500, 'maxclust')
 
         cluster_map = {}
-        mica_list = []
+        simgic_list = []
+        gic_times_cluster = []
         cluster_sizes = []
-        unclustered = 0
-        poor = 0
-        medium = 0
-        good = 0
-        excellent = 0
+        sem_jac_list = []
 
         for disease_id, cluster_id in zip(labels, clusters):
             try:
@@ -96,12 +114,14 @@ def main():
 
         for cluster_id, diseases in cluster_map.items():
             cluster_sizes.append(len(diseases))
+            """
             if len(set(diseases).intersection(mondo_skip)) > 0:
                 if len(diseases) == len(set(diseases).intersection(mondo_skip)):
                     logger.warning("Cannot evaluate cluster")
                     diseases = set(diseases)
                 else:
                     diseases = set(diseases) - mondo_skip
+
             common_ancestors = set()
             is_first = True
             for disease in diseases:
@@ -112,38 +132,35 @@ def main():
                     common_ancestors = common_ancestors.intersection(
                         owl_utils.get_closure(mondo_graph, disease, root=root)
                     )
-            mica = max([ic_map[d] for d in common_ancestors])
-            mica_list.append(mica)
-            if mica <= .001:
-                unclustered += len(cluster_map[cluster_id])
-            elif .001 < mica <= 3:
-                poor += len(cluster_map[cluster_id])
-            elif 3 < mica <= 6:
-                medium += len(cluster_map[cluster_id])
-            elif 6 < mica <= 9:
-                good += len(cluster_map[cluster_id])
-            else:
-                excellent += len(cluster_map[cluster_id])
+            #mica = max([ic_map[d] for d in common_ancestors])
+            #mica_list.append(mica)
+            """
+            profile_list = []
+            for disease in diseases:
+                profile_list.append(disease2phen[disease])
+            sim_gic = sem_sim.groupwise_sim_gic(profile_list)
+            simgic_list.append(sim_gic)
+            gic_times_cluster.append(sim_gic * len(diseases))
+            sim_jaccard = sem_sim.groupwise_jaccard(profile_list)
+            sem_jac_list.append(sim_jaccard)
+
 
         singleton_count = sum([len(v) for k, v in cluster_map.items() if len(v) == 1])
         sizes = [len(v) for k, v in cluster_map.items()]
 
         #output.write("{:.4f}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
-        output.write("{:.4f}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
+        output.write("{:.4f}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
             #clust_meth[meth],
             dist,
             'ward',
-            mean(mica_list),
-            median(mica_list),
+            mean(simgic_list),
+            median(simgic_list),
             len(cluster_map.keys()),
             mean(sizes),
             median(sizes),
             singleton_count,
-            unclustered,
-            poor,
-            medium,
-            good,
-            excellent
+            mean(sem_jac_list),
+            median(sem_jac_list)
         ))
 
 
