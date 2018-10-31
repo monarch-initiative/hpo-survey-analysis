@@ -26,6 +26,28 @@ root = "HP:0000118"
 hpo = Graph()
 hpo.parse("http://purl.obolibrary.org/obo/hp.owl", format='xml')
 
+top_phenotypes = {
+    'HP:0000924',
+    'HP:0000707',
+    'HP:0000152',
+    'HP:0001574',
+    'HP:0000478',
+    'HP:0001626',
+    'HP:0001939',
+    'HP:0000119',
+    'HP:0025031',
+    'HP:0002664',
+    'HP:0001871',
+    'HP:0002715',
+    'HP:0000818',
+    'HP:0003011',
+    'HP:0002086',
+    'HP:0000598',
+    'HP:0003549',
+    'HP:0001197',
+    'HP:0001507',
+    'HP:0000769'
+}
 
 # I/O
 pheno_fh = open(args.phenotypes, 'r')
@@ -73,6 +95,9 @@ for mondo in disease_list:
     scores = monarch.get_annotation_sufficiency_score(pheno_profile)
     disease_score = scores['scaled_score']
 
+    lay_profile = list(lay_profile)
+    profile_size= len(lay_profile)
+
     # Add noise to profile
     """
     Remove 5% of annotations at random
@@ -81,9 +106,7 @@ for mondo in disease_list:
        one level higher in the HPO ontology
 
     If the profile contains 1-4 phenotypes, move one level higher in the ontology
-    """
-    lay_profile = list(lay_profile)
-    profile_size= len(lay_profile)
+
     if profile_size >= 20:
         count_to_remove = round(profile_size * .05)
         indices = (random.sample(range(0, profile_size-count_to_remove), count_to_remove))
@@ -101,6 +124,50 @@ for mondo in disease_list:
             selected_phenotype = URIRef(expand_uri(sel_phenotype, strict=True)[0])
             objs = hpo.objects(selected_phenotype, RDFS['subClassOf'])
             lay_profile[i] = contract_uri(str(list(objs)[0]), strict=True)[0]
+    """
+
+    """
+    New protocol:
+    20% omit phenotype
+    10% use closest parent
+    10% add random phenotype
+    """
+    # Remove 20 percent of phenotypes
+    count_to_remove = round(profile_size * .2)
+    indices = (random.sample(range(0, profile_size - count_to_remove), count_to_remove))
+    for i in indices:
+        del lay_profile[i]
+
+    profile_size = len(lay_profile)
+
+    # mutate 10 percent to closest parent
+    count_to_mutate = round(profile_size * .1)
+    indices = (random.sample(range(0, profile_size), count_to_mutate))
+    for i in indices:
+        sel_phenotype = lay_profile[i]
+        parents = get_closure(hpo, sel_phenotype, RDFS['subClassOf'], ROOT, False)
+        lay_overlap = parents.intersection(pheno_list)
+        if len(lay_overlap) == 0:
+            # Use abn phenotype as place holder?
+            lay_profile[i] = ROOT
+            continue
+        max_ic = max([ic_map[parent] for parent in lay_overlap])
+        mica = ''
+        for pheno in lay_overlap:
+            if ic_map[pheno] == max_ic:
+                mica = pheno
+        lay_profile[i] = mica
+
+    # add random phenotype(s)
+    # Prefer phenotypes not taken from the top of ontology,
+    # but use these as a last resort
+    phenos_to_select = (pheno_list - top_phenotypes) - set(lay_profile)
+    comission_count = round(profile_size * .1)
+    for i in range(comission_count - 1):
+        random_pheno = random.choice(list(phenos_to_select))
+        lay_profile.append(random_pheno)
+        phenos_to_select = phenos_to_select - set(random_pheno)
+
 
     if (len(lay_profile) == 0):
         output.write("{}\t{}\t{}\n".format(
