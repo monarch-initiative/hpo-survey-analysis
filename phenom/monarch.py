@@ -25,6 +25,7 @@ session.mount('https://', adapter)
 def get_solr_results(solr, params):
     solr_params = copy.deepcopy(params)  # don't mutate input
     result_count = solr_params['rows']
+    if 'start' not in solr_params: solr_params['start'] = 0
     while solr_params['start'] < result_count:
         solr_request = session.get(solr, params=solr_params)
         response = solr_request.json()
