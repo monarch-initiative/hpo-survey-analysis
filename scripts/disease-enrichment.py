@@ -12,22 +12,22 @@ Construct 2x2 contingency table and run fisher exact
                nCls         nNotCls
 
 https://github.com/biolink/ontobio/blob/d2ab6f/ontobio/assocmodel.py#L432
+#from phenom.math.enrichment import fisher_exact
+scipy version of fisher exact is much faster
 """
-from phenom.monarch import get_solr_results
-from phenom.math.enrichment import fisher_exact
-#from scipy.stats import fisher_exact
+from phenom.monarch import get_solr_results, get_mondo_classes
+from scipy.stats import fisher_exact
+import requests
+from copy import deepcopy
 
 # monarch associations
 MONARCH_ASSOC = 'https://solr.monarchinitiative.org/solr/golr/select'
-
-# monarch search
-MONARCH_SEARCH = 'https://solr.monarchinitiative.org/solr/search/select'
 
 # https://github.com/monarch-initiative/hpo-plain-index
 HPO_SOLR = 'https://solr.monarchinitiative.org/solr/hpo-pl/select'
 
 # i/o
-output = open("/path/to/lay-enrich.tsv", "w")
+output = open("/path/to/out.tsv", "w")
 
 all_phenotypes = set()
 lay_phenotypes = set()  # terms w lay syn
@@ -48,20 +48,11 @@ for pheno in get_solr_results(HPO_SOLR, params):
 
 not_lay_phenotypes = all_phenotypes - lay_phenotypes
 
-# Get all diseases using monarch search index
-# ?q=*:*&fl=id,label&wt=json&fq=prefix:MONDO
-params = {
-    'rows': 100,
-    'fl': 'id,label',
-    'q': '*:*',
-    'fq': 'prefix:MONDO',
-    'wt': 'json'
-}
-for disease in get_solr_results(MONARCH_SEARCH, params):
-    mondo_diseases[disease['id']] = disease['label'][0]
+mondo_diseases_tmp = get_mondo_classes()
 
-# Get associations using golr
-params = {
+# Get all disease classes with direct or inferred phenotype annotations
+facet_limit = 100000
+d2p_params = {
     'rows': 1000,
     'fl': 'subject_closure,object_closure',  # object for direct
     'q': '*:*',
@@ -72,26 +63,52 @@ params = {
     ],
     'wt': 'json'
 }
+facet_params = deepcopy(d2p_params)
+facet_params['rows'] = 0
+facet_params['facet'] = "true"
+facet_params['json.nl'] = "arrarr"
+facet_params['facet.mincount'] = "1"
+facet_params['facet.limit'] = facet_limit
+facet_params['facet.field'] = "subject_closure"
+
+solr_req = requests.get(MONARCH_ASSOC, params=facet_params)
+facets = solr_req.json()
+facet_list = facets['facet_counts']['facet_fields']['subject_closure']
+
+if len(facet_list) > facet_limit:
+    raise ValueError("Did not collect all diseases, increase facet limit")
+
+for field in facet_list:
+    if field[0].startswith('MONDO') and field[0] in mondo_diseases_tmp:
+        mondo_diseases[field[0]] = mondo_diseases_tmp[field[0]]
+
+mondo_diseases_tmp = None
+
+# Get associations using golr
 associations = []
-for assoc in get_solr_results(MONARCH_ASSOC, params):
-    disease_set = {dis for dis in assoc['subject_closure']
-                   if dis.startswith('MONDO')}
-    phenotype_set = {phe for phe in assoc['object_closure']
-                     if phe.startswith('HP')}
+for assoc in get_solr_results(MONARCH_ASSOC, d2p_params):
+    diseases = {dis for dis in assoc['subject_closure']
+                if dis.startswith('MONDO')}
+    phenotypes = {phe for phe in assoc['object_closure']
+                  if phe.startswith('HP')}
     #if not assoc['object'].startswith('HP'): continue
-    #phenotype_set = {assoc['object']}
-    associations.append((disease_set, phenotype_set))
+    #phenotypes = {assoc['object']}
+    associations.append((diseases, phenotypes))
 
 # number of hypotheses for bonferroni correction
-# hypotheses = number of disease classes
+# hypotheses = number of disease classes with at least 1 association
 hypothesis_count = len(mondo_diseases.keys())
 
 # background count = number of phenotype classes
 background_count = len(all_phenotypes)
 
 results = []
+counter = 0
 
 for disease, label in mondo_diseases.items():
+
+    if counter % 1000 == 0:
+        print("Processed {} out of {} diseases".format(counter, hypothesis_count))
 
     # phenotypes annotated to disease class
     lay_annotated = set()
@@ -100,10 +117,8 @@ for disease, label in mondo_diseases.items():
         if disease in assoc[0]:
             lay_in_disease = lay_phenotypes & assoc[1]
             not_lay_dis = not_lay_phenotypes & assoc[1]
-            if len(lay_in_disease) > 0:
-                lay_annotated = lay_annotated | lay_in_disease
-            elif len(not_lay_dis) > 0:
-                background_annot = background_annot | not_lay_dis
+            lay_annotated = lay_annotated & lay_in_disease
+            background_annot = background_annot & not_lay_dis
 
     # number of lay phenotypes not annotated to dis class
     lay_not_annotated = len(lay_phenotypes) - len(lay_annotated)
@@ -118,13 +133,14 @@ for disease, label in mondo_diseases.items():
         [len(background_annot), background_not_annot]
     ]
 
-    p_value = fisher_exact(matrix, 'greater')
+    odds_ratio, p_value = fisher_exact(matrix, 'greater')
     results.append({
         'id': disease,
         'label': label,
         'p-value': p_value,
         'p-value-correct': p_value * hypothesis_count
     })
+    counter += 1
 
 associations = None
 # sort results

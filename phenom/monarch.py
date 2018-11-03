@@ -3,6 +3,7 @@ import logging
 import json
 from json import JSONDecodeError
 import copy
+from typing import Dict
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,7 @@ SCIGRAPH_URL  = 'https://scigraph-ontology-dev.monarchinitiative.org/scigraph'
 OWLSIM_URL    = 'https://monarchinitiative.org/owlsim/'
 MONARCH_SCORE = 'https://monarchinitiative.org/score'
 MONARCH_ASSOC = 'https://solr.monarchinitiative.org/solr/golr/select'
+MONARCH_SEARCH = 'https://solr.monarchinitiative.org/solr/search/select'
 
 session = requests.Session()
 adapter = requests.adapters.HTTPAdapter(max_retries=10)
@@ -127,4 +129,19 @@ def owlsim_compare(profile_a, profile_b):
         sim_score = 0
         
     return sim_score
+
+
+def get_mondo_classes() -> Dict[str, str]:
+    mondo_diseases = dict()
+    # ?q=*:*&fl=id,label&wt=json&fq=prefix:MONDO
+    params = {
+        'rows': 100,
+        'fl': 'id,label',
+        'q': '*:*',
+        'fq': 'prefix:MONDO',
+        'wt': 'json'
+    }
+    for disease in get_solr_results(MONARCH_SEARCH, params):
+        mondo_diseases[disease['id']] = disease['label'][0]
+    return mondo_diseases
 
