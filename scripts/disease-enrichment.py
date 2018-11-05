@@ -117,8 +117,8 @@ for disease, label in mondo_diseases.items():
         if disease in assoc[0]:
             lay_in_disease = lay_phenotypes & assoc[1]
             not_lay_dis = not_lay_phenotypes & assoc[1]
-            lay_annotated = lay_annotated & lay_in_disease
-            background_annot = background_annot & not_lay_dis
+            lay_annotated = lay_annotated | lay_in_disease
+            background_annot = background_annot | not_lay_dis
 
     # number of lay phenotypes not annotated to dis class
     lay_not_annotated = len(lay_phenotypes) - len(lay_annotated)
