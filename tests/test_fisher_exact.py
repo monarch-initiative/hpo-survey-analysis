@@ -47,7 +47,6 @@ def compare_with_scipy_gh_issue(fisher_exact):
     """
     https://github.com/scipy/scipy/issues/4130
     """
-    epsilon = 1e-10
     table = [[345, 455], [260, 345]]
     _, two_sided = fisher_exact(table, "two-sided")
     expected = 0.9567
@@ -69,7 +68,7 @@ def test_phenom_against_scipy_issue():
     from phenom.math.enrichment import fisher_exact
     compare_with_scipy_gh_issue(fisher_exact)
 
-# Fails
+@pytest.mark.skip(reason="https://github.com/scipy/scipy/issues/4130")
 def test_scipy_against_scipy_issue():
     from scipy.stats import fisher_exact
     compare_with_scipy_gh_issue(fisher_exact)
