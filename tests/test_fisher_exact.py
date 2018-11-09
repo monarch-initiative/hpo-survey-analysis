@@ -64,9 +64,11 @@ def test_scipy_against_r(table, expected):
     from scipy.stats import fisher_exact
     compare_with_r(table, expected, fisher_exact)
 
+
 def test_phenom_against_scipy_issue():
     from phenom.math.enrichment import fisher_exact
     compare_with_scipy_gh_issue(fisher_exact)
+
 
 @pytest.mark.skip(reason="https://github.com/scipy/scipy/issues/4130")
 def test_scipy_against_scipy_issue():

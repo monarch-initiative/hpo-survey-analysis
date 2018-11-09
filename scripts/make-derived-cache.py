@@ -24,7 +24,7 @@ args = parser.parse_args()
 
 root = "HP:0000118"
 hpo = Graph()
-hpo.parse("http://purl.obolibrary.org/obo/hp.owl", format='xml')
+hpo.parse("../data/hp.owl", format='xml')
 
 # Dictionaries
 ic_map: Dict[str, float] = {}

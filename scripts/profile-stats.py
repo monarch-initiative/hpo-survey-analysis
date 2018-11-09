@@ -25,12 +25,12 @@ with open(args.annotations, 'r') as cache_file:
 
 print( "median: ",
     median([
-        len(foo) for foo in disease2phen.values()
+        len(pheno) for pheno in disease2phen.values()
     ])
 )
 
 print( "mean: ",
     mean([
-        len(foo) for foo in disease2phen.values()
+        len(pheno) for pheno in disease2phen.values()
     ])
 )

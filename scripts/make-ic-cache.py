@@ -14,12 +14,15 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # globals and constants
-HPO_ONTOLOGY = "http://purl.obolibrary.org/obo/hp.owl"
+#HPO_ONTOLOGY = "http://purl.obolibrary.org/obo/hp.owl"
+HPO_ONTOLOGY = "../data/hp.owl"
 
 # contains manual and semi-automated annotations created by the HPO-team.
 # These are annotations of OMIM-, Orphanet-, and DECIPHER-entries
-HPO_DATA = "http://compbio.charite.de/jenkins/job/hpo.annotations/" \
-           "lastStableBuild/artifact/misc/phenotype_annotation.tab"
+#HPO_DATA = "http://compbio.charite.de/jenkins/job/hpo.annotations/" \
+#           "lastStableBuild/artifact/misc/phenotype_annotation.tab"
+
+HPO_DATA = "../data/phenotype_annotation.tab"
 
 
 def main():
@@ -89,15 +92,21 @@ def main():
         ))
 
 
-def _process_hpo_data(url: str) -> Dict[str, Set[str]]:
+def _process_hpo_data(file_path: str) -> Dict[str, Set[str]]:
 
     mondo_merged_lines: List[str] = []
-    disease_info: Dict(str, Tuple[str]) = {}
+    disease_info: Dict[str, Tuple[str]] = {}
+
+    if file_path.startswith("http"):
+        context_manager = closing(requests.get(file_path))
+    else:
+        context_manager = open(file_path, "r")
 
     # https://stackoverflow.com/a/35371451
-    with closing(requests.get(url)) as file:
-        content = file.content.decode('utf-8')
-        reader = csv.reader(content.splitlines(), delimiter='\t', quotechar='\"')
+    with context_manager as file:
+        if file_path.startswith("http"):
+            file = file.content.decode('utf-8').splitlines()
+        reader = csv.reader(file, delimiter='\t', quotechar='\"')
         counter = 0
         for row in reader:
             try:
