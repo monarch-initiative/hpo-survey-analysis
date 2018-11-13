@@ -3,7 +3,7 @@ import logging
 import json
 from json import JSONDecodeError
 import copy
-from typing import Dict
+from typing import Dict, Tuple, Set, Optional, List
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +18,8 @@ OWLSIM_URL    = 'https://monarchinitiative.org/owlsim/'
 MONARCH_SCORE = 'https://monarchinitiative.org/score'
 MONARCH_ASSOC = 'https://solr.monarchinitiative.org/solr/golr/select'
 MONARCH_SEARCH = 'https://solr.monarchinitiative.org/solr/search/select'
+# https://github.com/monarch-initiative/hpo-plain-index
+HPO_SOLR = 'https://solr.monarchinitiative.org/solr/hpo-pl/select'
 
 session = requests.Session()
 adapter = requests.adapters.HTTPAdapter(max_retries=10)
@@ -145,3 +147,107 @@ def get_mondo_classes() -> Dict[str, str]:
         mondo_diseases[disease['id']] = disease['label'][0]
     return mondo_diseases
 
+
+def get_layslim() -> Tuple[Set, Set]:
+    """
+    Get the set of hpo classes with a lay synonym and the classes without
+    """
+    all_phenotypes = set()
+    lay_phenotypes = set()  # terms w lay syn
+    not_lay_phenotypes = set()  # terms w/o lay syn
+    # Get all phenotypes in HPO as background using phenotypr index
+    params = {
+        'rows': 100,
+        'fl': 'id,has_pl_syn',
+        'q': '*:*'
+    }
+
+    for pheno in get_solr_results(HPO_SOLR, params):
+        all_phenotypes.add(pheno['id'])
+        if pheno['has_pl_syn'] is True:
+            lay_phenotypes.add(pheno['id'])
+
+    not_lay_phenotypes = all_phenotypes - lay_phenotypes
+    return lay_phenotypes, not_lay_phenotypes
+
+
+def get_diseases_with_pheno_annotations(
+        disease_classes:Optional[Dict] = None) -> Dict[str, str]:
+    """
+    Get a dictionary of diseases with one or more phenotype annotations
+    """
+    mondo_diseases = dict()  # Dict[str,str] - id: label
+    facet_limit = 100000
+    d2p_params = {
+        'rows': 0,
+        'q': '*:*',
+        'fq': [
+            'subject_category:disease',
+            'object_category:phenotype',
+            'relation:"RO:0002200"'
+        ],
+        'wt': 'json',
+        'facet': 'true',
+        'json.nl': 'arrarr',
+        'facet.mincount': 1,
+        'facet.limit': facet_limit,
+        'facet.field': 'subject_closure'
+    }
+    solr_req = requests.get(MONARCH_ASSOC, params=d2p_params)
+    facets = solr_req.json()
+    facet_list = facets['facet_counts']['facet_fields']['subject_closure']
+
+    if len(facet_list) > facet_limit:
+        raise ValueError("Did not collect all diseases, increase facet limit")
+
+    for field in facet_list:
+        if disease_classes is not None \
+                and field[0].startswith('MONDO') and field[0] in disease_classes:
+            mondo_diseases[field[0]] = disease_classes[field[0]]
+        elif field[0].startswith('MONDO'):
+            mondo_diseases[field[0]] = ""
+
+    return mondo_diseases
+
+
+def get_disease_to_phenotype(
+        include_inferred: Optional[bool] = True) -> List[Tuple[Set, Set]]:
+    """
+    Get disease to phenotype annotations
+    Returns a list of of tuples [({d1,d2,d3}, {p1,p2,p3}),...]
+    where d1,d2,d3 have phenotypes p1,p2,p3
+
+    if include_inferred is set to False, sets will contain
+    one disease and phenotype each
+
+    :param include_inferred: if True include inferred associations
+    """
+    associations = []
+    if include_inferred is True:
+        fields = 'subject_closure,object_closure'
+    else:
+        fields = 'subject_closure,object'
+    d2p_params = {
+        'rows': 1000,
+        'fl': fields,
+        'q': '*:*',
+        'fq': [
+            'subject_category:disease',
+            'object_category:phenotype',
+            'relation:"RO:0002200"'
+        ],
+        'wt': 'json'
+    }
+    for assoc in get_solr_results(MONARCH_ASSOC, d2p_params):
+        diseases = {dis for dis in assoc['subject_closure']
+                    if dis.startswith('MONDO')}
+        if include_inferred:
+            phenotypes = {phe for phe in assoc['object_closure']
+                          if phe.startswith('HP')}
+        else:
+            if not assoc['object'].startswith('HP'):
+                continue
+            phenotypes = {assoc['object']}
+        associations.append((diseases, phenotypes))
+
+    return associations

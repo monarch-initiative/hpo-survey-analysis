@@ -133,3 +133,12 @@ def get_profile_closure(
             graph, pheno, predicate, root, reflexive=True, negative=negative)
          for pheno in profile])
     )
+
+
+def label(curie: str, graph: Graph) -> str:
+    """
+    Given a list of phenotypes, get the reflexive closure for each phenotype
+    stored in a single set.  This can be used for jaccard similarity or
+    simGIC
+    """
+    return graph.label(URIRef(expand_uri(curie, strict=True)))

@@ -54,7 +54,7 @@ def main():
 
     #logger.info("loading mondo")
     # Previous cache made with 2018-08-03 version of mondo
-    #mondo_graph.parse("/home/kshefchek/git/mondo-2018-08-03/src/ontology/reasoned.owl", format='xml')
+    #mondo_graph.parse("/path/to/git/mondo-2018-08-03/src/ontology/reasoned.owl", format='xml')
     #root = "MONDO:0000001"
 
     logger.info("loading hpo")

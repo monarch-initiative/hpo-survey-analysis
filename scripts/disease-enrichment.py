@@ -15,92 +15,98 @@ https://github.com/biolink/ontobio/blob/d2ab6f/ontobio/assocmodel.py#L432
 #from phenom.math.enrichment import fisher_exact
 scipy version of fisher exact is much faster
 """
-from phenom.monarch import get_solr_results, get_mondo_classes
+from phenom import monarch
+from phenom.utils.owl_utils import get_closure
 from scipy.stats import fisher_exact
-import requests
-from copy import deepcopy
+from rdflib import Graph
+import gzip
+import argparse
 
-# monarch associations
-MONARCH_ASSOC = 'https://solr.monarchinitiative.org/solr/golr/select'
-
-# https://github.com/monarch-initiative/hpo-plain-index
-HPO_SOLR = 'https://solr.monarchinitiative.org/solr/hpo-pl/select'
+parser = argparse.ArgumentParser(
+    description='Generate information content for each HPO class using the '
+                'HPO phenotype annotation file ')
+parser.add_argument('--mondo_labels', '-m', type=str, required=False,
+                    help='Cached 2 column diseases and labels tsv')
+parser.add_argument('--mondo_assoc', '-a', type=str, required=False,
+                    help='path to mondo to phenotype assoc 2 column tsv')
+parser.add_argument('--lay_pheno', '-l', type=str, required=False,
+                    help='path to lay phenotypes 1 column txt')
+parser.add_argument('--not_lay_pheno', '-nl', type=str, required=False,
+                    help='path to nonlay phenotypes 1 column txt')
+parser.add_argument('--output', '-o', type=str, required=False,
+                    help='Location of output file', default="./enrichment.tsv")
+args = parser.parse_args()
 
 # i/o
-output = open("/path/to/out.tsv", "w")
+output = open(args.output, "w")
 
-all_phenotypes = set()
-lay_phenotypes = set()  # terms w lay syn
-not_lay_phenotypes = set()  # terms w/o lay syn
-mondo_diseases = dict()  # Dict[str,str] - id: label
-
-# Get all phenotypes in HPO as background using phenotypr index
-params = {
-    'rows': 100,
-    'fl': 'id,has_pl_syn',
-    'q': '*:*'
-}
-
-for pheno in get_solr_results(HPO_SOLR, params):
-    all_phenotypes.add(pheno['id'])
-    if pheno['has_pl_syn'] is True:
-        lay_phenotypes.add(pheno['id'])
-
-not_lay_phenotypes = all_phenotypes - lay_phenotypes
-
-mondo_diseases_tmp = get_mondo_classes()
-
-# Get all disease classes with direct or inferred phenotype annotations
-facet_limit = 100000
-d2p_params = {
-    'rows': 1000,
-    'fl': 'subject_closure,object_closure',  # object for direct
-    'q': '*:*',
-    'fq': [
-        'subject_category:disease',
-        'object_category:phenotype',
-        'relation:"RO:0002200"'
-    ],
-    'wt': 'json'
-}
-facet_params = deepcopy(d2p_params)
-facet_params['rows'] = 0
-facet_params['facet'] = "true"
-facet_params['json.nl'] = "arrarr"
-facet_params['facet.mincount'] = "1"
-facet_params['facet.limit'] = facet_limit
-facet_params['facet.field'] = "subject_closure"
-
-solr_req = requests.get(MONARCH_ASSOC, params=facet_params)
-facets = solr_req.json()
-facet_list = facets['facet_counts']['facet_fields']['subject_closure']
-
-if len(facet_list) > facet_limit:
-    raise ValueError("Did not collect all diseases, increase facet limit")
-
-for field in facet_list:
-    if field[0].startswith('MONDO') and field[0] in mondo_diseases_tmp:
-        mondo_diseases[field[0]] = mondo_diseases_tmp[field[0]]
-
-mondo_diseases_tmp = None
-
-# Get associations using golr
+include_inferred = False
+lay_phenotypes = set()
+not_lay_phenotypes = set()
+mondo_diseases_tmp = dict()
+mondo_diseases = dict()
 associations = []
-for assoc in get_solr_results(MONARCH_ASSOC, d2p_params):
-    diseases = {dis for dis in assoc['subject_closure']
-                if dis.startswith('MONDO')}
-    phenotypes = {phe for phe in assoc['object_closure']
-                  if phe.startswith('HP')}
-    #if not assoc['object'].startswith('HP'): continue
-    #phenotypes = {assoc['object']}
-    associations.append((diseases, phenotypes))
+
+if args.lay_pheno and args.not_lay_pheno:
+    with open(args.lay_pheno, 'r') as lay_pheno:
+        for line in lay_pheno:
+            lay_phenotypes.add(line.rstrip("\n"))
+    with open(args.not_lay_pheno, 'r') as not_lay_pheno:
+        for line in not_lay_pheno:
+            not_lay_phenotypes.add(line.rstrip("\n"))
+else:
+    lay_phenotypes, not_lay_phenotypes = monarch.get_layslim()
+
+#all_phenotypes = lay_phenotypes | not_lay_phenotypes
+
+if args.mondo_labels:
+    with open(args.mondo_labels, 'r') as mondo_labels:
+        for line in mondo_labels:
+            disease_id, disease_label = line.rstrip("\n").split("\t")
+            mondo_diseases_tmp[disease_id] = disease_label
+else:
+    mondo_diseases_tmp = monarch.get_mondo_classes()
+
+if args.mondo_assoc:
+    print("Fetching associations from cache file")
+    counter = 0
+    hpo = Graph()
+    mondo = Graph()
+    mondo.parse(gzip.open("../data/mondo.owl.gz", 'rb'), format='xml')
+    if include_inferred:
+        hpo.parse("../data/hp.owl", format='xml')
+    with open(args.mondo_assoc, 'r') as mondo_labels:
+        for line in mondo_labels:
+            if line.startswith('#'): continue
+            if not line.startswith('MONDO'): continue
+            if counter % 10000 == 0:
+                print("Processed {} associations".format(counter))
+            disease, phenotype = line.rstrip("\n").split("\t")[0:2]
+            try:
+                mondo_diseases[disease] = mondo_diseases_tmp[disease]
+            except KeyError:
+                mondo_diseases[disease] = "obsoleted class"
+
+            disease_closure = get_closure(mondo, disease, root='MONDO:0000001')
+            if include_inferred:
+                phenotype_closure = get_closure(hpo, phenotype, root='HP:0000118')
+                associations.append((disease_closure, phenotype_closure))
+            else:
+                associations.append((disease_closure, {phenotype}))
+            counter += 1
+
+else:
+    print("Fetching associations from golr")
+    # Get associations using golr
+    mondo_diseases = monarch.get_diseases_with_pheno_annotations(mondo_diseases_tmp)
+    associations = monarch.get_disease_to_phenotype(include_inferred)
+
+print("Finished fetching associations")
+mondo_diseases_tmp = None
 
 # number of hypotheses for bonferroni correction
 # hypotheses = number of disease classes with at least 1 association
 hypothesis_count = len(mondo_diseases.keys())
-
-# background count = number of phenotype classes
-background_count = len(all_phenotypes)
 
 results = []
 counter = 0
