@@ -1,4 +1,3 @@
-from phenom.utils import owl_utils
 from rdflib import Graph
 import logging
 import gzip
@@ -14,6 +13,11 @@ mondo_graph.parse(gzip.open("../data/mondo.owl.gz", 'rb'), format='xml')
 root = "MONDO:0000001"
 
 logging.info("Getting classes")
-all_diseases = owl_utils.get_descendants(mondo_graph, root)
-for disease in all_diseases:
-    output_file.write("{}\t{}\n".format(disease, owl_utils.label(disease, mondo_graph)))
+all_classes = set()
+for disease in mondo_graph.subjects():
+    if str(disease).startswith("http://purl.obolibrary.org/obo/MONDO_"):
+        all_classes.add(disease)
+
+for uri in all_classes:
+    curie = str(uri).replace("http://purl.obolibrary.org/obo/MONDO_", "MONDO:")
+    output_file.write("{}\t{}\n".format(curie, mondo_graph.label(uri)))

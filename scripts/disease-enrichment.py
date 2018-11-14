@@ -23,8 +23,8 @@ import gzip
 import argparse
 
 parser = argparse.ArgumentParser(
-    description='Generate information content for each HPO class using the '
-                'HPO phenotype annotation file ')
+    description='Perform disease enrichment using fisher exact test'
+)
 parser.add_argument('--mondo_labels', '-m', type=str, required=False,
                     help='Cached 2 column diseases and labels tsv')
 parser.add_argument('--mondo_assoc', '-a', type=str, required=False,
@@ -57,7 +57,7 @@ if args.lay_pheno and args.not_lay_pheno:
 else:
     lay_phenotypes, not_lay_phenotypes = monarch.get_layslim()
 
-#all_phenotypes = lay_phenotypes | not_lay_phenotypes
+# all_phenotypes = lay_phenotypes | not_lay_phenotypes
 
 if args.mondo_labels:
     with open(args.mondo_labels, 'r') as mondo_labels:
