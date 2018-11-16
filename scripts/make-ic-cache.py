@@ -6,6 +6,7 @@ from phenom import monarch
 from phenom.utils import owl_utils
 from phenom.math import math_utils
 from prefixcommons import contract_uri, expand_uri
+from prefixcommons.curie_util import NoPrefix
 from rdflib import Graph, URIRef, OWL, RDFS
 import logging
 import argparse
@@ -140,6 +141,15 @@ def _process_hpo_data(file_path: str) -> Dict[str, List[str]]:
                 logger.warn("No mondo id for {}".format(disease_id))
                 continue
 
+            has_omim = False
+            for obj in mondo.objects(mondo_iri, OWL['equivalentClass']):
+                try:
+                    curie = contract_uri(str(obj), strict=True)[0]
+                except NoPrefix:
+                    continue
+                if curie.startswith('OMIM'):
+                    has_omim = True
+
             # use scigraph instead of the above
             # mondo_node = monarch.get_clique_leader(disease_id)
             # mondo_curie = mondo_node['id']
@@ -149,6 +159,7 @@ def _process_hpo_data(file_path: str) -> Dict[str, List[str]]:
                 continue
 
             if disease_id.startswith('Orphanet') \
+                    and has_omim is False \
                     and len(list(mondo.objects(mondo_iri, RDFS['subClassOf']))) > 0:
                 # disease is a disease group, skip
                 logger.info("{} is a disease group, skipping".format(disease_id))
