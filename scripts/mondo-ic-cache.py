@@ -10,6 +10,7 @@ import logging
 import argparse
 from argparse import ArgumentError
 
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,7 @@ def main():
 
     # Previous cache made with 2018-08-03 version of mondo
     logger.info("Loading MONDO")
-    mondo_graph.parse("/home/kshefchek/git/mondo-2018-08-03/src/ontology/reasoned.owl", format='xml')
+    mondo_graph.parse("/path/to/git/mondo-2018-08-03/src/ontology/reasoned.owl", format='xml')
     root = "MONDO:0000001"
 
     logger.info("Getting classes")

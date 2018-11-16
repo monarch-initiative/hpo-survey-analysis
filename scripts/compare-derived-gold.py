@@ -1,11 +1,10 @@
 from phenom import monarch
 from phenom.similarity.semantic_sim import SemanticSim
-from phenom.utils import owl_utils
+from phenom.utils.owl_utils import get_closure
 import argparse
 import logging
-from rdflib import Graph, RDFS, URIRef
+from rdflib import Graph, RDFS
 import random
-from prefixcommons import contract_uri, expand_uri
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -80,7 +79,7 @@ for mondo in disease_list:
     disease_only = pheno_profile - lay_profile
 
     for phenotype in disease_only:
-        parents = owl_utils.get_closure(hpo, phenotype, RDFS['subClassOf'], root)
+        parents = get_closure(hpo, phenotype, RDFS['subClassOf'], root)
         lay_overlap = parents.intersection(pheno_list)
         if len(lay_overlap) == 0:
             continue
@@ -95,61 +94,33 @@ for mondo in disease_list:
     scores = monarch.get_annotation_sufficiency_score(pheno_profile)
     disease_score = scores['scaled_score']
 
-    lay_profile = list(lay_profile)
-    profile_size= len(lay_profile)
-
-    # Add noise to profile
     """
-    Remove 5% of annotations at random
-    If profile is <= 20: 
-       randomly select 10% phenotypes and move them
-       one level higher in the HPO ontology
-
-    If the profile contains 1-4 phenotypes, move one level higher in the ontology
-
-    if profile_size >= 20:
-        count_to_remove = round(profile_size * .05)
-        indices = (random.sample(range(0, profile_size-count_to_remove), count_to_remove))
-        for i in indices:
-            del lay_profile[i]
-
-    elif profile_size < 10 and profile_size != 0:
-        count_to_mutate = round(profile_size * .1)
-        if count_to_mutate == 0:
-            count_to_mutate = 1
-        indices = (random.sample(range(0, profile_size), count_to_mutate))
-        for i in indices:
-            sel_phenotype = lay_profile[i]
-            # get parent(s) select 1st if multiple
-            selected_phenotype = URIRef(expand_uri(sel_phenotype, strict=True)[0])
-            objs = hpo.objects(selected_phenotype, RDFS['subClassOf'])
-            lay_profile[i] = contract_uri(str(list(objs)[0]), strict=True)[0]
-    """
-
-    """
-    New protocol:
+    Add noise to profile
     20% omit phenotype
     10% use closest parent
     10% add random phenotype
     """
+    lay_profile = list(lay_profile)
+    profile_size= len(lay_profile)
+
     # Remove 20 percent of phenotypes
     count_to_remove = round(profile_size * .2)
     indices = (random.sample(range(0, profile_size - count_to_remove), count_to_remove))
     for i in indices:
         del lay_profile[i]
 
-    profile_size = len(lay_profile)
+    mutatable = set(lay_profile) - top_phenotypes
 
     # mutate 10 percent to closest parent
     count_to_mutate = round(profile_size * .1)
-    indices = (random.sample(range(0, profile_size), count_to_mutate))
+    indices = (random.sample(range(0, len(list(mutatable))), count_to_mutate))
     for i in indices:
         sel_phenotype = lay_profile[i]
-        parents = get_closure(hpo, sel_phenotype, RDFS['subClassOf'], ROOT, False)
+        parents = get_closure(hpo, sel_phenotype, RDFS['subClassOf'], root, False)
         lay_overlap = parents.intersection(pheno_list)
         if len(lay_overlap) == 0:
             # Use abn phenotype as place holder?
-            lay_profile[i] = ROOT
+            lay_profile[i] = root
             continue
         max_ic = max([ic_map[parent] for parent in lay_overlap])
         mica = ''
@@ -167,7 +138,6 @@ for mondo in disease_list:
         random_pheno = random.choice(list(phenos_to_select))
         lay_profile.append(random_pheno)
         phenos_to_select = phenos_to_select - set(random_pheno)
-
 
     if (len(lay_profile) == 0):
         output.write("{}\t{}\t{}\n".format(

@@ -5,9 +5,11 @@ from contextlib import closing
 from phenom import monarch
 from phenom.utils import owl_utils
 from phenom.math import math_utils
-from rdflib import Graph
+from prefixcommons import contract_uri, expand_uri
+from rdflib import Graph, URIRef, OWL, RDFS
 import logging
 import argparse
+import gzip
 from argparse import ArgumentError
 
 logging.basicConfig(level=logging.INFO)
@@ -92,10 +94,14 @@ def main():
         ))
 
 
-def _process_hpo_data(file_path: str) -> Dict[str, Set[str]]:
+def _process_hpo_data(file_path: str) -> Dict[str, List[str]]:
+    logger.info("loading mondo into memory")
+    mondo = Graph()
+    mondo.parse(gzip.open("../data/mondo.owl.gz", 'rb'), format='xml')
+    logger.info("finished loading mondo")
 
     mondo_merged_lines: List[str] = []
-    disease_info: Dict[str, Tuple[str]] = {}
+    disease_info: Dict[str, List[str]] = {}
 
     if file_path.startswith("http"):
         context_manager = closing(requests.get(file_path))
@@ -121,12 +127,34 @@ def _process_hpo_data(file_path: str) -> Dict[str, Set[str]]:
             if db == 'ORPHANET': db = 'Orphanet'
 
             disease_id = "{}:{}".format(db, num)
-            mondo_node = monarch.get_clique_leader(disease_id)
-            mondo_id = mondo_node['id']
-            if 'hgnc' in mondo_id:
-                mondo_id = disease_id  # something went wrong
+            disease_iri = URIRef(expand_uri(disease_id, strict=True))
+            mondo_curie = None
+            mondo_iri = None
+            for subj in mondo.subjects(OWL['equivalentClass'], disease_iri):
+                curie = contract_uri(str(subj), strict=True)[0]
+                if curie.startswith('MONDO'):
+                    mondo_curie = curie
+                    mondo_iri = subj
+                    break
+            if mondo_curie is None:
+                logger.warn("No mondo id for {}".format(disease_id))
+                continue
 
-            mondo_merged_lines.append((mondo_id, pheno_id, onset, freq, severity))
+            # use scigraph instead of the above
+            # mondo_node = monarch.get_clique_leader(disease_id)
+            # mondo_curie = mondo_node['id']
+            if mondo_curie is not None and 'hgnc' in mondo_curie:
+                # to keep these, likely decipher IDs
+                # mondo_curie = disease_id
+                continue
+
+            if disease_id.startswith('Orphanet') \
+                    and len(list(mondo.objects(mondo_iri, RDFS['subClassOf']))) > 0:
+                # disease is a disease group, skip
+                logger.info("{} is a disease group, skipping".format(disease_id))
+                continue
+
+            mondo_merged_lines.append((mondo_curie, pheno_id, onset, freq, severity))
 
             counter += 1
             if counter % 10000 == 0:
@@ -144,9 +172,6 @@ def _process_hpo_data(file_path: str) -> Dict[str, Set[str]]:
             # attempt to merge by collapsing freq, onset, severity
             # that is empty in one disease but not another
             # conflicts will defer to the disease first inserted
-            #
-            # Note in python this is a copy of a reference
-            # so mutating changes both
             merged_disease_info = disease_info[key]
             for index, val in enumerate(values):
                 if val == disease_info[key][index] \

@@ -30,7 +30,6 @@ hpo.parse("../data/hp.owl", format='xml')
 ic_map: Dict[str, float] = {}
 gold_standard: Dict[str, List[str]] = {}
 
-
 # I/O
 pheno_fh = open(args.phenotypes, 'r')
 disease_fh = open(args.diseases, 'r')

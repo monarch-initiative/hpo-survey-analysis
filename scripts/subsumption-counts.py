@@ -4,8 +4,8 @@ from typing import Dict, Set
 import argparse
 
 parser = argparse.ArgumentParser(
-    description='Generate information content for each HPO class using the '
-                'HPO phenotype annotation file ')
+    description='Determines by uniqueness counting the number'
+                ' of other diseases that subsume it')
 parser.add_argument('--derived_annotations', '-da', type=str, required=True)
 parser.add_argument('--annotations', '-a', type=str, required=True,
                     help='Cached gold standard disease phenotype annotations')
