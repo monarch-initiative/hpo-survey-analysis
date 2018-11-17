@@ -1,9 +1,8 @@
-from typing import Dict, Set, FrozenSet
-from phenom.utils.owl_utils import get_closure
+from typing import Dict, Set
 import argparse
 import logging
-from rdflib import Graph, RDFS
-import random
+from rdflib import Graph
+from phenom.utils.simulate import simulate_from_derived
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -76,76 +75,6 @@ with open(args.ic_cache, 'r') as ic_file:
 
 output = open(args.output, 'w')
 
-
-def simulate_from_derived(
-        pheno_profile: Set[str],
-        pheno_subset: Set[str],
-        graph: Graph,
-        root: str,
-        ic_values: Dict[str, float],
-        filter_out: Set[str]) -> FrozenSet[str]:
-    """
-    Add imprecision and noise to profile
-    20% omit phenotype - omissions
-    10% use closest parent - imprecision
-    30% add random phenotype - noise, min 1
-    :return: FrozenSet[str] - set of phenotype curies
-    """
-    omission_rate = .2
-    imprecision_rate = .1
-    noise_rate = .3
-
-    phenotypes = list(pheno_profile)
-    profile_size = len(phenotypes)
-
-    # Remove 20 percent of phenotypes
-    count_to_remove = round(profile_size * omission_rate)
-    indices = (random.sample(range(0, profile_size - count_to_remove), count_to_remove))
-    for i in indices:
-        del phenotypes[i]
-
-    # mutate 10 percent to closest parent
-    count_to_mutate = round(profile_size * imprecision_rate)
-    #indices = (random.sample(range(0, len(list(mutatable))), count_to_mutate))
-    random.shuffle(phenotypes)
-    counter = 0
-    for idx, pheno in enumerate(phenotypes):
-        if counter == count_to_mutate:
-            break
-        parents = get_closure(graph, pheno, RDFS['subClassOf'], root, False)
-        lay_overlap = parents.intersection(pheno_subset)
-        if len(lay_overlap) == 0:
-            continue
-        max_ic = max([ic_values[parent] for parent in lay_overlap])
-        mica = ''
-        for pheno in lay_overlap:
-            if ic_values[pheno] == max_ic:
-                mica = pheno
-
-        phenotypes[idx] = mica
-        counter += 1
-
-    if counter != count_to_mutate:
-        logger.info("Could not mutate profile derived from {}".format(disease))
-
-    # add random phenotype(s)
-    # Filter out phenotypes from filter_out set
-    phenos_to_select = pheno_subset.difference(filter_out) \
-                                   .difference(phenotypes) \
-                                   .difference(pheno_profile)
-    if len(list(phenos_to_select)) == 0:
-        logger.warn("No phenptypes to select for "
-                    "profile derived from {}".format(disease))
-    comissions = round(profile_size * noise_rate)
-    noise_count = 1 if comissions == 0 else comissions
-    for i in range(noise_count):
-        random_pheno = random.choice(list(phenos_to_select))
-        phenotypes.append(random_pheno)
-        phenos_to_select = phenos_to_select - set(random_pheno)
-
-    return frozenset(phenotypes)
-
-
 logging.info("creating simulated patients")
 sim_count = 0
 total_patients = len(derived_profiles.keys()) * patients_per_disease
@@ -171,7 +100,8 @@ for disease, derived_prof in derived_profiles.items():
                 graph = hpo,
                 root = abn_phenotype,
                 ic_values = ic_map,
-                filter_out = top_phenotypes
+                filter_out = top_phenotypes,
+                ref_disease = disease
             )
         )
         iterations += 1

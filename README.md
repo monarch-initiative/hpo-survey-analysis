@@ -3,9 +3,10 @@ A library for analyzing surveys utilizing the HPO
 
 
 #### What's Included?
-- phenom: a python library for analyzing hpo surveys
+- phenom: a python library with modules for querying monarch remote services, working with ontologies,
+seand performing semantic similarity and distance computations
 - Jupyter notebooks demoing various tasks
-- Scripts for running analyses
+- Scripts for generating synthetic patient data, clustering, and evaluation
 
 #### Getting Started
 
@@ -24,11 +25,11 @@ A library for analyzing surveys utilizing the HPO
 
 
 #### Features
-- Utilities for generating derived profiles from gold standard annotations, either best match or noisy
-- Analyzing semantic similarity, disease classification of derived HPO profiles
-- Disease and/or phenotype class enrichment
-- Utilities for generating subsets of terms
-- Simulate survey responses (yes, no, absent)
+- Implementations of common semantic similarity algorithms
+- Disease and/or phenotype class enrichment (fisher exact)
+- Clustering phenotype profiles
+- Utilities for generating derived profiles from hpo rare disease annotations
+- Simulate patient data
 
 
 #### Example Surveys of Interest

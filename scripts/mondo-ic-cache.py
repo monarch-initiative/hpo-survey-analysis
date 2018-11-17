@@ -1,14 +1,10 @@
-from typing import Dict, Set, List, Tuple
+from typing import Dict
 import csv
-import requests
-from contextlib import closing
-from phenom import monarch
 from phenom.utils import owl_utils
 from phenom.math import math_utils
 from rdflib import Graph
 import logging
 import argparse
-from argparse import ArgumentError
 
 
 logging.basicConfig(level=logging.INFO)
