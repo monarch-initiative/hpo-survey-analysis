@@ -1,0 +1,10 @@
+dataTsvs:
+- /data/owlsim3/conf/annotations.tsv
+labelTsvs:
+- /data/owlsim3/conf/mondo_labels.tsv
+ontologyDataUris: []
+ontologyUris:
+- /data/owlsim3/conf/hp.owl
+curies:
+  'HP': 'http://purl.obolibrary.org/obo/HP_'
+  'MONDO': 'http://purl.obolibrary.org/obo/MONDO_'
