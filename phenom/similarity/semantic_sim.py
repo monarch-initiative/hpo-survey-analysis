@@ -90,7 +90,7 @@ class SemanticSim():
                 profile_intersection = owl_utils.get_profile_closure(
                     profile, self.graph, self.root, predicate
                 )
-                if_first = False
+                is_first = False
             else:
                 profile_intersection = profile_intersection.intersection(
                     owl_utils.get_profile_closure(
@@ -131,7 +131,7 @@ class SemanticSim():
                 profile_intersection = owl_utils.get_profile_closure(
                     profile, self.graph, self.root, predicate
                 )
-                if_first = False
+                is_first = False
             else:
                 profile_intersection = profile_intersection.intersection(
                     owl_utils.get_profile_closure(
@@ -182,12 +182,12 @@ class SemanticSim():
             positive_b_profile, self.graph, self.root, predicate)
 
         neg_a_closure = {"-{}".format(item)
-                              for item in owl_utils.get_profile_closure(
+                         for item in owl_utils.get_profile_closure(
             negative_a_profile, self.graph, self.root, predicate, negative=True)
         }
 
         neg_b_closure = {"-{}".format(item)
-                              for item in owl_utils.get_profile_closure(
+                         for item in owl_utils.get_profile_closure(
             negative_b_profile, self.graph, self.root, predicate, negative=True)
         }
 
