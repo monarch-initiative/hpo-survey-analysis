@@ -5,3 +5,4 @@ prefixcommons
 numpy
 scipy
 matplotlib
+sklearn

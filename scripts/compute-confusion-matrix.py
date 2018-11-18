@@ -1,11 +1,12 @@
 """Given a file containing synthetic patient data, generates
-true positive rate and false positive rate for the owlsim3
-bayes classifier
+confusion matrix per rank for the owlsim3 bayes classifier
 """
 import argparse
 import logging
 from typing import Dict, Set, List
 import gzip
+import multiprocessing
+from multiprocessing import Process, Queue
 import requests
 
 logging.basicConfig(level=logging.INFO)
@@ -17,8 +18,82 @@ parser = argparse.ArgumentParser(
 parser.add_argument('--simulated', '-s', type=str, required=True)
 parser.add_argument('--output', '-o', type=str, required=False,
                     help='Location of output file', default="./confusion-matrix.tsv")
+parser.add_argument('--processes', '-p', type=int, required=False,
+                    default=int(multiprocessing.cpu_count()/2))
 
 args = parser.parse_args()
+
+
+def create_confusion_matrix_per_rank(
+        synthetic_patients: List,
+        owlsim_url: str,
+        sim_profiles: Dict[str, Set[str]],
+        disease_synth_map: Dict[str, str],
+        ranks_to_eval: int,
+        queue: Queue):
+
+    confusion_by_rank: Dict[int, List[int]] = {}
+
+    for rank in range(1, ranks_to_eval + 1):
+        # tp, fp, fn, tn
+        confusion_by_rank[rank] = [0, 0, 0, 0]
+
+    counter = 0
+    total = len(synthetic_patients)
+
+    for synth_patient in synthetic_patients:
+
+        if counter % 1000 == 0:
+            logging.info("processed {} patients out of {}".format(counter, total))
+        counter += 1
+
+        # Useful for testing
+        if counter == 250:
+            break
+
+        params = {
+            'id': sim_profiles[synth_patient],
+            'limit': 8000
+        }
+        sim_req = requests.get(owlsim_url, params)
+        sim_resp = sim_req.json()
+
+        disease_rank = None
+        disease = disease_synth_map[synth_patient]
+        if 'matches' not in sim_resp:
+            logger.info(sim_profiles[synth_patient])
+            continue
+
+        result_count = len(sim_resp['matches'])
+        # result_count = 7398
+
+        # find where the disease is ranked
+        for match in sim_resp['matches']:
+            if match['matchId'] == disease:
+                disease_rank = match['rank']
+
+        # create empty array of zeros
+        positives = [0 for rank in range(0, ranks_to_eval + 1)]
+        for match in sim_resp['matches']:
+            positives[match['rank']] += 1
+
+        for rank in range(1, ranks_to_eval + 1):
+            true_pos, false_pos, false_neg, true_neg = confusion_by_rank[rank]
+
+            positive_diseases = sum(positives[0:rank + 1])
+
+            if disease_rank <= rank:
+                true_pos += 1
+                true_neg += result_count - positive_diseases
+                false_pos += positive_diseases - 1
+            else:
+                false_neg += 1
+                false_pos += positive_diseases
+                true_neg += result_count - positive_diseases - 1
+
+            confusion_by_rank[rank] = [true_pos, false_pos, false_neg, true_neg]
+
+    queue.put(confusion_by_rank)
 
 owlsim_match = "http://localhost:9000/api/match/naive-bayes-fixed-weight-two-state"
 simulated_profiles: Dict[str, Set[str]] = {}
@@ -27,11 +102,11 @@ synth_to_disease: Dict[str, str] = {}
 # Confusion matrix per rank
 confusion_by_rank: Dict[int, List[int]] = {}
 
-ranks_to_eval = 20
+ranks_to_eval = 7398
 
 for rank in range(1, ranks_to_eval+1):
     # tp, fp, fn, tn
-    confusion_by_rank[rank] = [0,0,0,0]
+    confusion_by_rank[rank] = [0, 0, 0, 0]
 
 with gzip.open(args.simulated, 'rb') as synth_profiles:
     for line in synth_profiles:
@@ -45,49 +120,32 @@ with gzip.open(args.simulated, 'rb') as synth_profiles:
             simulated_profiles[patient] = {phenotype}
 
 output = open(args.output, 'w')
-total = len(simulated_profiles.items())
-counter = 0
 
-for synth_patient, profile in simulated_profiles.items():
+procs = []
+queue = Queue()
+result_list = []
 
-    if counter % 1000 == 0:
-        logging.info("processed {} patients out of {}".format(counter, total))
-    counter += 1
+# Split into chunks depending on args.processes
+for chunk in [list(simulated_profiles.keys())[i::args.processes]
+              for i in range(args.processes)]:
+    proc = Process(target=create_confusion_matrix_per_rank,
+                   args=(chunk, owlsim_match, simulated_profiles,
+                         synth_to_disease, ranks_to_eval, queue))
+    proc.start()
+    procs.append(proc)
 
-    params = {
-        'id': profile,
-        'limit': 300
-    }
-    sim_req = requests.get(owlsim_match, params)
-    sim_resp = sim_req.json()
+for i in range(args.processes):
+    result_list.append(queue.get())
 
-    disease_rank = None
-    disease = synth_to_disease[synth_patient]
-    result_count = len(sim_resp['matches'])
+for proc in procs:
+    proc.join()
 
-    # find where the disease is ranked
-    for match in sim_resp['matches']:
-        if match['matchId'] == disease:
-            disease_rank = match['rank']  # TODO ties?
-        else:
-            # We could alternatively set the limit very high to get the real rank
-            disease_rank = 9000
-
-    #if disease_rank is None:
-    #    logger.warn("Cannot find disease in results")
-    #    disease_rank = 8000
-
-    for rank in range(1, ranks_to_eval+1):
-        true_pos, false_pos, false_neg, true_neg = confusion_by_rank[rank]
-        if disease_rank <= rank:
-            true_pos += 1
-            true_neg += result_count - rank
-            false_pos += rank - 1
-        else:
-            false_neg += 1
-            false_pos += rank
-            true_neg += result_count - rank - 1
-
+for matrix in result_list:
+    for rank, table in matrix.items():
+        confusion_by_rank[rank][0] += table[0]
+        confusion_by_rank[rank][1] += table[1]
+        confusion_by_rank[rank][2] += table[2]
+        confusion_by_rank[rank][3] += table[3]
 
 for rank, confusion_matrix in confusion_by_rank.items():
     output.write("{}\t{}\t{}\t{}\t{}\n".format(
