@@ -20,18 +20,18 @@ def simulate_from_derived(
     30% add random phenotype - noise, min 1
     :return: FrozenSet[str] - set of phenotype curies
     """
-    omission_rate = .2
-    imprecision_rate = .1
+    omission_rate = .4  # .4 for gold, .2 for derived
+    imprecision_rate = .3  # .3 for gold, .1 for derived
     noise_rate = .3
 
     phenotypes = list(pheno_profile)
     profile_size = len(phenotypes)
 
-    # Remove 20 percent of phenotypes
+    # Remove x percent of phenotypes
     count_to_remove = round(profile_size * omission_rate)
     phenotypes = random.sample(phenotypes, profile_size - count_to_remove)
 
-    # mutate 10 percent to closest parent
+    # mutate x percent to closest parent
     count_to_mutate = round(profile_size * imprecision_rate)
     random.shuffle(phenotypes)
     counter = 0

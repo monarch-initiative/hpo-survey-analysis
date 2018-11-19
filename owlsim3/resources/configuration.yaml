@@ -1,5 +1,5 @@
 dataTsvs:
-- /data/owlsim3/conf/annotations.tsv
+- /data/owlsim3/conf/gold_profiles.tsv
 labelTsvs:
 - /data/owlsim3/conf/mondo_labels.tsv
 ontologyDataUris: []

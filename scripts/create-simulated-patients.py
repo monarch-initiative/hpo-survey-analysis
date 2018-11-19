@@ -30,6 +30,7 @@ hpo = Graph()
 hpo.parse("../data/hp.owl", format='xml')
 
 top_phenotypes = {
+    "HP:0000118",
     'HP:0000924',
     'HP:0000707',
     'HP:0000152',
