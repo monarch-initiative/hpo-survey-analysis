@@ -48,8 +48,8 @@ def create_confusion_matrix_per_rank(
         counter += 1
 
         # Useful for testing
-        if counter == 250:
-            break
+        #if counter == 500:
+        #    break
 
         params = {
             'id': sim_profiles[synth_patient],
