@@ -48,8 +48,8 @@ def create_confusion_matrix_per_rank(
         counter += 1
 
         # Useful for testing
-        #if counter == 500:
-        #    break
+        if counter == 500:
+            break
 
         params = {
             'id': sim_profiles[synth_patient],
@@ -72,15 +72,42 @@ def create_confusion_matrix_per_rank(
             if match['matchId'] == disease:
                 disease_rank = match['rank']
 
-        # create empty array of zeros
-        positives = [0 for rank in range(0, ranks_to_eval + 1)]
+        # list to store adjusted ranks
+        ranks = []
+
+        # Resolve ties, take the average rank
+        last_rank = 0
+        tie_count = 0
         for match in sim_resp['matches']:
-            positives[match['rank']] += 1
+            if last_rank < match['rank']:
+                if tie_count == 0:
+                    ranks.append(last_rank)
+                else:
+                    avg_rank = round(( 2*last_rank + tie_count ) / 2)
+                    tied_ranks = [avg_rank for n in range(tie_count)]
+                    ranks.extend(tied_ranks)
+                    # reset tie count
+                    tie_count = 0
+            else:
+                tie_count += 1
+
+            last_rank = match['rank']
+
+        # make sure last
+        # DRY violation, refactor
+        if tie_count > 0:
+            avg_rank = round((2 * last_rank + tie_count) / 2)
+            tied_ranks = [avg_rank for n in range(tie_count)]
+            ranks.extend(tied_ranks)
+
+        positives = [0 for r in range(0, ranks_to_eval + 1)]
+        for rank in ranks[1:]:
+            positives[rank] += 1
 
         for rank in range(1, ranks_to_eval + 1):
             true_pos, false_pos, false_neg, true_neg = confusion_by_rank[rank]
 
-            positive_diseases = sum(positives[0:rank + 1])
+            positive_diseases = sum(positives[0:rank+1])
 
             if disease_rank <= rank:
                 true_pos += 1
