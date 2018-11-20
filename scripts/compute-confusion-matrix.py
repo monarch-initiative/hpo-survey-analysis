@@ -24,6 +24,9 @@ parser.add_argument('--processes', '-p', type=int, required=False,
 args = parser.parse_args()
 
 
+def triangle_number(num):
+    return num * (num + 1) / 2
+
 def create_confusion_matrix_per_rank(
         synthetic_patients: List,
         owlsim_url: str,
@@ -48,7 +51,7 @@ def create_confusion_matrix_per_rank(
         counter += 1
 
         # Useful for testing
-        if counter == 500:
+        if counter == 50:
             break
 
         params = {
@@ -68,9 +71,9 @@ def create_confusion_matrix_per_rank(
         # result_count = 7398
 
         # find where the disease is ranked
-        for match in sim_resp['matches']:
+        for disease_index, match in enumerate(sim_resp['matches']):
             if match['matchId'] == disease:
-                disease_rank = match['rank']
+                disease_rank = disease_index
 
         # list to store adjusted ranks
         ranks = []
@@ -83,7 +86,8 @@ def create_confusion_matrix_per_rank(
                 if tie_count == 0:
                     ranks.append(last_rank)
                 else:
-                    avg_rank = round(( 2*last_rank + tie_count ) / 2)
+                    deranked = triangle_number(last_rank + (tie_count - 1)) - triangle_number(last_rank - 1)
+                    avg_rank = round(deranked / tie_count)
                     tied_ranks = [avg_rank for n in range(tie_count)]
                     ranks.extend(tied_ranks)
                     # reset tie count
@@ -99,6 +103,8 @@ def create_confusion_matrix_per_rank(
             avg_rank = round((2 * last_rank + tie_count) / 2)
             tied_ranks = [avg_rank for n in range(tie_count)]
             ranks.extend(tied_ranks)
+
+        disease_rank = ranks[disease_rank -1]
 
         positives = [0 for r in range(0, ranks_to_eval + 1)]
         for rank in ranks[1:]:
