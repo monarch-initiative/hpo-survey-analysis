@@ -24,7 +24,7 @@ parser.add_argument('--processes', '-p', type=int, required=False,
 args = parser.parse_args()
 
 
-def triangle_number(num):
+def binomial_coeff(num):
     return (num * (num + 1)) / 2
 
 def create_confusion_matrix_per_rank(
@@ -32,14 +32,14 @@ def create_confusion_matrix_per_rank(
         owlsim_url: str,
         sim_profiles: Dict[str, Set[str]],
         disease_synth_map: Dict[str, str],
-        ranks_to_eval: int,
+        num_classes: int,
         queue: Queue):
 
     confusion_by_rank: Dict[int, List[int]] = {}
 
-    for rank in range(1, ranks_to_eval + 1):
+    for cutoff in range(1, num_classes + 1):
         # tp, fp, fn, tn
-        confusion_by_rank[rank] = [0, 0, 0, 0]
+        confusion_by_rank[cutoff] = [0, 0, 0, 0]
 
     counter = 0
     total = len(synthetic_patients)
@@ -51,8 +51,8 @@ def create_confusion_matrix_per_rank(
         counter += 1
 
         # Useful for testing
-        if counter == 50:
-            break
+        #if counter == 100:
+        #    break
 
         params = {
             'id': sim_profiles[synth_patient],
@@ -64,11 +64,10 @@ def create_confusion_matrix_per_rank(
         disease_rank = None
         disease = disease_synth_map[synth_patient]
         if 'matches' not in sim_resp:
-            logger.info(sim_profiles[synth_patient])
-            continue
+            raise ValueError("Could not find match for {}".format(sim_profiles[synth_patient]))
 
-        result_count = len(sim_resp['matches'])
-        # result_count = 7398
+        # could dynamically generated num_classes here
+        # num_classes = len(sim_resp['matches'])
 
         # find where the disease is ranked
         for disease_index, match in enumerate(sim_resp['matches']):
@@ -92,7 +91,10 @@ def create_confusion_matrix_per_rank(
                     last_avg_rank += 1
                     ranks.append(last_avg_rank)
                 else:
-                    deranked_summed = triangle_number(last_rank + (tie_count - 1)) - triangle_number(last_rank - 1)
+                    tie_count += 1
+                    deranked_summed = \
+                        binomial_coeff(last_avg_rank + (tie_count - 1)) - \
+                        binomial_coeff(last_avg_rank - 1)
                     avg_rank = round(deranked_summed / tie_count)
                     tied_ranks = [avg_rank for n in range(tie_count)]
                     ranks.extend(tied_ranks)
@@ -111,34 +113,37 @@ def create_confusion_matrix_per_rank(
         # make sure last
         # DRY violation, refactor
         if tie_count > 0:
-            deranked_summed = triangle_number(last_rank + (tie_count - 1)) - triangle_number(last_rank - 1)
+            deranked_summed = \
+                binomial_coeff(last_avg_rank + (tie_count - 1)) - \
+                binomial_coeff(last_avg_rank - 1)
             avg_rank = round(deranked_summed / tie_count)
             tied_ranks = [avg_rank for n in range(tie_count)]
             ranks.extend(tied_ranks)
 
         disease_rank = ranks[disease_rank]
 
-        positives = [0 for r in range(0, ranks_to_eval + 1)]
-        for rank in ranks:
-            positives[rank] += 1
+        positives = [0 for r in range(0, num_classes + 1)]
+        for rnk in ranks:
+            positives[rnk] += 1
 
-        for rank in range(1, ranks_to_eval + 1):
-            true_pos, false_pos, false_neg, true_neg = confusion_by_rank[rank]
+        for cutoff in range(1, num_classes + 1):
+            true_pos, false_pos, false_neg, true_neg = confusion_by_rank[cutoff]
 
-            positive_diseases = sum(positives[0:rank+1])
+            positive_diseases = sum(positives[0:cutoff+1])
 
-            if disease_rank <= rank:
+            if disease_rank <= cutoff:
                 true_pos += 1
-                true_neg += result_count - positive_diseases
+                true_neg += num_classes - positive_diseases
                 false_pos += positive_diseases - 1
             else:
                 false_neg += 1
                 false_pos += positive_diseases
-                true_neg += result_count - positive_diseases - 1
+                true_neg += num_classes - positive_diseases - 1
 
-            confusion_by_rank[rank] = [true_pos, false_pos, false_neg, true_neg]
+            confusion_by_rank[cutoff] = [true_pos, false_pos, false_neg, true_neg]
 
     queue.put(confusion_by_rank)
+
 
 owlsim_match = "http://localhost:9000/api/match/naive-bayes-fixed-weight-two-state"
 simulated_profiles: Dict[str, Set[str]] = {}
@@ -146,12 +151,6 @@ synth_to_disease: Dict[str, str] = {}
 
 # Confusion matrix per rank
 confusion_by_rank: Dict[int, List[int]] = {}
-
-ranks_to_eval = 7398
-
-for rank in range(1, ranks_to_eval+1):
-    # tp, fp, fn, tn
-    confusion_by_rank[rank] = [0, 0, 0, 0]
 
 with gzip.open(args.simulated, 'rb') as synth_profiles:
     for line in synth_profiles:
@@ -164,6 +163,13 @@ with gzip.open(args.simulated, 'rb') as synth_profiles:
         except KeyError:
             simulated_profiles[patient] = {phenotype}
 
+# len(list(
+classes_to_eval = 7344
+
+for rank in range(1, classes_to_eval+1):
+    # tp, fp, fn, tn
+    confusion_by_rank[rank] = [0, 0, 0, 0]
+
 output = open(args.output, 'w')
 
 procs = []
@@ -175,7 +181,7 @@ for chunk in [list(simulated_profiles.keys())[i::args.processes]
               for i in range(args.processes)]:
     proc = Process(target=create_confusion_matrix_per_rank,
                    args=(chunk, owlsim_match, simulated_profiles,
-                         synth_to_disease, ranks_to_eval, queue))
+                         synth_to_disease, classes_to_eval, queue))
     proc.start()
     procs.append(proc)
 
