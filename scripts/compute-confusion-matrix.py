@@ -25,7 +25,7 @@ args = parser.parse_args()
 
 
 def triangle_number(num):
-    return num * (num + 1) / 2
+    return (num * (num + 1)) / 2
 
 def create_confusion_matrix_per_rank(
         synthetic_patients: List,
@@ -79,35 +79,47 @@ def create_confusion_matrix_per_rank(
         ranks = []
 
         # Resolve ties, take the average rank
-        last_rank = 0
+        last_rank = 1
+        last_avg_rank = 1
         tie_count = 0
-        for match in sim_resp['matches']:
+        is_first = True
+        for match in sim_resp['matches'][1:]:
             if last_rank < match['rank']:
                 if tie_count == 0:
-                    ranks.append(last_rank)
+                    if is_first:
+                        ranks.append(1)
+                        is_first = False
+                    last_avg_rank += 1
+                    ranks.append(last_avg_rank)
                 else:
-                    deranked = triangle_number(last_rank + (tie_count - 1)) - triangle_number(last_rank - 1)
-                    avg_rank = round(deranked / tie_count)
+                    deranked_summed = triangle_number(last_rank + (tie_count - 1)) - triangle_number(last_rank - 1)
+                    avg_rank = round(deranked_summed / tie_count)
                     tied_ranks = [avg_rank for n in range(tie_count)]
                     ranks.extend(tied_ranks)
                     # reset tie count
+                    last_avg_rank = avg_rank
                     tie_count = 0
             else:
-                tie_count += 1
+                if is_first:
+                    tie_count = 2
+                    is_first = False
+                else:
+                    tie_count += 1
 
             last_rank = match['rank']
 
         # make sure last
         # DRY violation, refactor
         if tie_count > 0:
-            avg_rank = round((2 * last_rank + tie_count) / 2)
+            deranked_summed = triangle_number(last_rank + (tie_count - 1)) - triangle_number(last_rank - 1)
+            avg_rank = round(deranked_summed / tie_count)
             tied_ranks = [avg_rank for n in range(tie_count)]
             ranks.extend(tied_ranks)
 
-        disease_rank = ranks[disease_rank -1]
+        disease_rank = ranks[disease_rank]
 
         positives = [0 for r in range(0, ranks_to_eval + 1)]
-        for rank in ranks[1:]:
+        for rank in ranks:
             positives[rank] += 1
 
         for rank in range(1, ranks_to_eval + 1):
