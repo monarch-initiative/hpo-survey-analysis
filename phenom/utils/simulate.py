@@ -1,5 +1,6 @@
-from typing import Dict, Set, FrozenSet, Optional
+from typing import Dict, Set, FrozenSet, Optional, List
 from phenom.utils.owl_utils import get_closure
+from phenom.math.math_utils import binomial_coeff
 from rdflib import Graph, RDFS
 import random
 import logging
@@ -70,3 +71,58 @@ def simulate_from_derived(
         phenos_to_select.remove(random_pheno)
 
     return frozenset(phenotypes)
+
+
+
+def average_ties(previous_rank: int, tie_count: int) -> int:
+    deranked_summed = \
+        binomial_coeff(previous_rank + (tie_count - 1)) - \
+        binomial_coeff(previous_rank - 1)
+    return round(deranked_summed / tie_count)
+
+
+def rerank_by_average(matches: List) -> List[int]:
+    """
+    Given a list of ranked results, averages ties and
+    reranks following
+    :param matches:
+    :return: List of ranks
+    """
+    # list to store adjusted ranks
+    ranks = []
+    # Resolve ties, take the average rank
+    last_rank = 1
+    last_avg_rank = 1
+    tie_count = 0
+    is_first = True
+    for match in matches[1:]:
+        if last_rank < match['rank']:
+            if tie_count == 0:
+                if is_first:
+                    ranks.append(1)
+                    is_first = False
+                last_avg_rank += 1
+                ranks.append(last_avg_rank)
+            else:
+                tie_count += 1
+                avg_rank = average_ties(last_avg_rank, tie_count)
+                tied_ranks = [avg_rank for n in range(tie_count)]
+                ranks.extend(tied_ranks)
+                # reset tie count
+                last_avg_rank = avg_rank
+                tie_count = 0
+        else:
+            if is_first:
+                tie_count = 2
+                is_first = False
+            else:
+                tie_count += 1
+
+        last_rank = match['rank']
+
+    if tie_count > 0:
+        avg_rank = average_ties(last_avg_rank, tie_count)
+        tied_ranks = [avg_rank for n in range(tie_count)]
+        ranks.extend(tied_ranks)
+
+    return ranks

@@ -24,3 +24,7 @@ def information_content(frequency: Num) -> float:
     else:
         ic = -(math.log(frequency))
     return ic
+
+
+def binomial_coeff(num):
+    return (num * (num + 1)) / 2

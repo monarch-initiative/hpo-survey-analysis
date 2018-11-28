@@ -7,6 +7,7 @@ from typing import Dict, Set, List
 import gzip
 import multiprocessing
 from multiprocessing import Process, Queue
+from phenom.utils.simulate import rerank_by_average
 import requests
 
 logging.basicConfig(level=logging.INFO)
@@ -23,9 +24,6 @@ parser.add_argument('--processes', '-p', type=int, required=False,
 
 args = parser.parse_args()
 
-
-def binomial_coeff(num):
-    return (num * (num + 1)) / 2
 
 def create_confusion_matrix_per_rank(
         synthetic_patients: List,
@@ -51,8 +49,8 @@ def create_confusion_matrix_per_rank(
         counter += 1
 
         # Useful for testing
-        #if counter == 100:
-        #    break
+        if counter == 100:
+            break
 
         params = {
             'id': sim_profiles[synth_patient],
@@ -74,51 +72,7 @@ def create_confusion_matrix_per_rank(
             if match['matchId'] == disease:
                 disease_rank = disease_index
 
-        # list to store adjusted ranks
-        ranks = []
-
-        # Resolve ties, take the average rank
-        last_rank = 1
-        last_avg_rank = 1
-        tie_count = 0
-        is_first = True
-        for match in sim_resp['matches'][1:]:
-            if last_rank < match['rank']:
-                if tie_count == 0:
-                    if is_first:
-                        ranks.append(1)
-                        is_first = False
-                    last_avg_rank += 1
-                    ranks.append(last_avg_rank)
-                else:
-                    tie_count += 1
-                    deranked_summed = \
-                        binomial_coeff(last_avg_rank + (tie_count - 1)) - \
-                        binomial_coeff(last_avg_rank - 1)
-                    avg_rank = round(deranked_summed / tie_count)
-                    tied_ranks = [avg_rank for n in range(tie_count)]
-                    ranks.extend(tied_ranks)
-                    # reset tie count
-                    last_avg_rank = avg_rank
-                    tie_count = 0
-            else:
-                if is_first:
-                    tie_count = 2
-                    is_first = False
-                else:
-                    tie_count += 1
-
-            last_rank = match['rank']
-
-        # make sure last
-        # DRY violation, refactor
-        if tie_count > 0:
-            deranked_summed = \
-                binomial_coeff(last_avg_rank + (tie_count - 1)) - \
-                binomial_coeff(last_avg_rank - 1)
-            avg_rank = round(deranked_summed / tie_count)
-            tied_ranks = [avg_rank for n in range(tie_count)]
-            ranks.extend(tied_ranks)
+        ranks = rerank_by_average(sim_resp['matches'])
 
         disease_rank = ranks[disease_rank]
 
