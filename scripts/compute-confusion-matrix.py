@@ -49,8 +49,8 @@ def create_confusion_matrix_per_rank(
         counter += 1
 
         # Useful for testing
-        if counter == 100:
-            break
+        #if counter == 100:
+        #    break
 
         params = {
             'id': sim_profiles[synth_patient],
@@ -72,7 +72,8 @@ def create_confusion_matrix_per_rank(
             if match['matchId'] == disease:
                 disease_rank = disease_index
 
-        ranks = rerank_by_average(sim_resp['matches'])
+        owlsim_ranks = [match['rank'] for match in sim_resp['matches']]
+        ranks = rerank_by_average(owlsim_ranks)
 
         disease_rank = ranks[disease_rank]
 

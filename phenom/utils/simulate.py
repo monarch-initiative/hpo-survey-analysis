@@ -73,15 +73,14 @@ def simulate_from_derived(
     return frozenset(phenotypes)
 
 
-
 def average_ties(previous_rank: int, tie_count: int) -> int:
     deranked_summed = \
-        binomial_coeff(previous_rank + (tie_count - 1)) - \
-        binomial_coeff(previous_rank - 1)
+        binomial_coeff(previous_rank + (tie_count)) - \
+        binomial_coeff(previous_rank)
     return round(deranked_summed / tie_count)
 
 
-def rerank_by_average(matches: List) -> List[int]:
+def rerank_by_average(ranks: List[int]) -> List[int]:
     """
     Given a list of ranked results, averages ties and
     reranks following
@@ -89,40 +88,40 @@ def rerank_by_average(matches: List) -> List[int]:
     :return: List of ranks
     """
     # list to store adjusted ranks
-    ranks = []
+    avg_ranks = []
     # Resolve ties, take the average rank
     last_rank = 1
-    last_avg_rank = 1
-    tie_count = 0
+    last_avg_rank = 0
+    tie_count = 1
     is_first = True
-    for match in matches[1:]:
-        if last_rank < match['rank']:
-            if tie_count == 0:
-                if is_first:
-                    ranks.append(1)
-                    is_first = False
+    for rank in ranks[1:]:
+        if rank > last_rank:
+            if tie_count == 1:
                 last_avg_rank += 1
-                ranks.append(last_avg_rank)
+                if is_first:
+                    avg_ranks.append(1)
+                    is_first = False
+                else:
+                    avg_ranks.append(last_avg_rank)
             else:
-                tie_count += 1
                 avg_rank = average_ties(last_avg_rank, tie_count)
                 tied_ranks = [avg_rank for n in range(tie_count)]
-                ranks.extend(tied_ranks)
+                avg_ranks.extend(tied_ranks)
                 # reset tie count
                 last_avg_rank = avg_rank
-                tie_count = 0
+                tie_count = 1
         else:
-            if is_first:
-                tie_count = 2
-                is_first = False
-            else:
-                tie_count += 1
+            tie_count += 1
+            is_first = False
 
-        last_rank = match['rank']
+        last_rank = rank
 
     if tie_count > 0:
         avg_rank = average_ties(last_avg_rank, tie_count)
         tied_ranks = [avg_rank for n in range(tie_count)]
-        ranks.extend(tied_ranks)
+        avg_ranks.extend(tied_ranks)
+    else:
+        last_avg_rank += 1
+        avg_ranks.append(last_avg_rank)
 
-    return ranks
+    return avg_ranks
