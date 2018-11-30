@@ -84,7 +84,7 @@ def create_confusion_matrix_per_threshold(
                 if threshold_type == 'rank':
                     disease_score = disease_index
                 elif threshold_type == 'probability':
-                    disease_score = match['rawScore']
+                    disease_score = float(match['rawScore'])
 
         positives = []
         cutoffs = []
@@ -101,7 +101,7 @@ def create_confusion_matrix_per_threshold(
             cutoffs = range(1, classes_to_eval + 1)
 
         elif threshold_type == 'probability':
-            scores = numpy.array([match['rawScore'] for match in sim_resp['matches']])
+            scores = numpy.array([float(match['rawScore']) for match in sim_resp['matches']])
             cutoffs = numpy.geomspace(1e-300, 1, classes_to_eval*5)
             cutoffs = numpy.flip(cutoffs)
             cutoffs = numpy.append(cutoffs, 0)

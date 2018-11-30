@@ -21,8 +21,8 @@ def simulate_from_derived(
     30% add random phenotype - noise, min 1
     :return: FrozenSet[str] - set of phenotype curies
     """
-    omission_rate = .4  # .4 for gold, .2 for derived
-    imprecision_rate = .3  # .3 for gold, .1 for derived
+    omission_rate = .2  # .4 for gold, .2 for derived
+    imprecision_rate = .1  # .3 for gold, .1 for derived
     noise_rate = .3
 
     phenotypes = list(pheno_profile)

@@ -27,7 +27,7 @@ ic_map: Dict[str, float] = {}
 
 abn_phenotype = "HP:0000118"
 hpo = Graph()
-hpo.parse("../data/hp.owl", format='xml')
+hpo.parse("../data/owl/hp.owl", format='xml')
 
 top_phenotypes = {
     "HP:0000118",
