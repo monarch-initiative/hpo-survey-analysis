@@ -9,6 +9,7 @@ import multiprocessing
 from multiprocessing import Process, Queue
 from phenom.utils.simulate import rerank_by_average
 import requests
+import numpy
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -25,22 +26,32 @@ parser.add_argument('--processes', '-p', type=int, required=False,
 args = parser.parse_args()
 
 
-def create_confusion_matrix_per_rank(
+def create_confusion_matrix_per_threshold(
         synthetic_patients: List,
         owlsim_url: str,
         sim_profiles: Dict[str, Set[str]],
         disease_synth_map: Dict[str, str],
         num_classes: int,
+        threshold_type: str,
         queue: Queue):
 
     confusion_by_rank: Dict[int, List[int]] = {}
 
-    for cutoff in range(1, num_classes + 1):
-        # tp, fp, fn, tn
-        confusion_by_rank[cutoff] = [0, 0, 0, 0]
-
     counter = 0
     total = len(synthetic_patients)
+
+    if threshold_type == 'rank':
+        for rank in range(1, classes_to_eval + 1):
+            # tp, fp, fn, tn
+            confusion_by_rank[rank] = [0, 0, 0, 0]
+    elif threshold_type == 'probability':
+        cutoffs = numpy.geomspace(1e-300, 1, classes_to_eval*5)
+        cutoffs = numpy.flip(cutoffs)
+        cutoffs = numpy.append(cutoffs, 0)
+        for cutoff in cutoffs:
+            confusion_by_rank[cutoff] = [0, 0, 0, 0]
+    else:
+        raise ValueError("{} not valid threshold".format(threshold_type))
 
     for synth_patient in synthetic_patients:
 
@@ -59,7 +70,6 @@ def create_confusion_matrix_per_rank(
         sim_req = requests.get(owlsim_url, params)
         sim_resp = sim_req.json()
 
-        disease_rank = None
         disease = disease_synth_map[synth_patient]
         if 'matches' not in sim_resp:
             raise ValueError("Could not find match for {}".format(sim_profiles[synth_patient]))
@@ -67,26 +77,66 @@ def create_confusion_matrix_per_rank(
         # could dynamically generated num_classes here
         # num_classes = len(sim_resp['matches'])
 
-        # find where the disease is ranked
+        # store the disease rank or score
+        disease_score = 0
         for disease_index, match in enumerate(sim_resp['matches']):
             if match['matchId'] == disease:
-                disease_rank = disease_index
+                if threshold_type == 'rank':
+                    disease_score = disease_index
+                elif threshold_type == 'probability':
+                    disease_score = match['rawScore']
 
-        owlsim_ranks = [match['rank'] for match in sim_resp['matches']]
-        ranks = rerank_by_average(owlsim_ranks)
+        positives = []
+        cutoffs = []
 
-        disease_rank = ranks[disease_rank]
+        if threshold_type == 'rank':
+            positives = [0 for r in range(0, num_classes + 1)]
+            owlsim_ranks = [match['rank'] for match in sim_resp['matches']]
+            avg_ranks = rerank_by_average(owlsim_ranks)
+            disease_score = avg_ranks[disease_score]
 
-        positives = [0 for r in range(0, num_classes + 1)]
-        for rnk in ranks:
-            positives[rnk] += 1
+            for rnk in avg_ranks:
+                positives[rnk] += 1
+            positives.pop(0)  # no ranks of 0, 1st rank is 0th index
+            cutoffs = range(1, classes_to_eval + 1)
 
-        for cutoff in range(1, num_classes + 1):
+        elif threshold_type == 'probability':
+            scores = numpy.array([match['rawScore'] for match in sim_resp['matches']])
+            cutoffs = numpy.geomspace(1e-300, 1, classes_to_eval*5)
+            cutoffs = numpy.flip(cutoffs)
+            cutoffs = numpy.append(cutoffs, 0)
+            positives = [0 for r in range(0, len(cutoffs))]
+            for index, prob in enumerate(cutoffs):
+                score_count = 0
+                if index == 0:
+                    positives[index] = 0
+                else:
+                    positives[index] = positives[index-1]
+                for score in scores:
+                    if score >= prob:
+                        score_count += 1
+                    else:
+                        break
+                positives[index] += score_count
+                scores = scores[score_count:]
+
+        else:
+            raise ValueError("{} not valid threshold".format(threshold_type))
+
+        for index, cutoff in enumerate(cutoffs):
             true_pos, false_pos, false_neg, true_neg = confusion_by_rank[cutoff]
 
-            positive_diseases = sum(positives[0:cutoff+1])
+            is_true_pos = False
+            if threshold_type == 'rank':
+                is_true_pos = disease_score <= cutoff
+                positive_diseases = sum(positives[0:cutoff])
+            elif threshold_type == 'probability':
+                is_true_pos = disease_score >= cutoff
+                positive_diseases = positives[index]
+            else:
+                raise ValueError
 
-            if disease_rank <= cutoff:
+            if is_true_pos:
                 true_pos += 1
                 true_neg += num_classes - positive_diseases
                 false_pos += positive_diseases - 1
@@ -121,9 +171,20 @@ with gzip.open(args.simulated, 'rb') as synth_profiles:
 # len(list(
 classes_to_eval = 7344
 
-for rank in range(1, classes_to_eval+1):
-    # tp, fp, fn, tn
-    confusion_by_rank[rank] = [0, 0, 0, 0]
+threshold = 'probability'
+
+if threshold == 'rank':
+    for rank in range(1, classes_to_eval+1):
+        # tp, fp, fn, tn
+        confusion_by_rank[rank] = [0, 0, 0, 0]
+elif threshold == 'probability':
+    cutoffs = numpy.geomspace(1e-300, 1, classes_to_eval*5)
+    cutoffs = numpy.flip(cutoffs)
+    cutoffs = numpy.append(cutoffs, 0)
+    for cutoff in cutoffs:
+        confusion_by_rank[cutoff] = [0, 0, 0, 0]
+else:
+    raise ValueError
 
 output = open(args.output, 'w')
 
@@ -134,9 +195,9 @@ result_list = []
 # Split into chunks depending on args.processes
 for chunk in [list(simulated_profiles.keys())[i::args.processes]
               for i in range(args.processes)]:
-    proc = Process(target=create_confusion_matrix_per_rank,
+    proc = Process(target=create_confusion_matrix_per_threshold,
                    args=(chunk, owlsim_match, simulated_profiles,
-                         synth_to_disease, classes_to_eval, queue))
+                         synth_to_disease, classes_to_eval, threshold, queue))
     proc.start()
     procs.append(proc)
 
