@@ -1,7 +1,11 @@
 from typing import Dict, Set, FrozenSet, Optional, List
 from phenom.utils.owl_utils import get_closure
 from phenom.math.math_utils import binomial_coeff
+from phenom.monarch import owlsim_classify
+from phenom.model.synthetic import SyntheticProfile
 from rdflib import Graph, RDFS
+from multiprocessing import Queue
+import numpy
 import random
 import logging
 
@@ -125,3 +129,115 @@ def rerank_by_average(ranks: List[int]) -> List[int]:
         avg_ranks.append(last_avg_rank)
 
     return avg_ranks
+
+
+def create_confusion_matrix_per_threshold(
+        synthetic_profiles: List[SyntheticProfile],
+        owlsim_url: str,
+        num_labels: int,
+        thresholds: List,
+        threshold_type: str,
+        queue: Queue):
+
+    confusion_by_rank: Dict[int, List[int]] = {}
+
+    counter = 0
+    total = len(synthetic_profiles)
+
+    for threshold in thresholds:
+        confusion_by_rank[threshold] = [0, 0, 0, 0]
+
+    for synth_profile in synthetic_profiles:
+
+        if counter % 1000 == 0:
+            logging.info("processed {} patients out of {}".format(counter, total))
+        counter += 1
+
+        # Useful for testing
+        if counter == 100:
+            break
+
+        sim_resp = owlsim_classify(synth_profile.phenotypes, num_labels, owlsim_url)
+
+        if 'matches' not in sim_resp:
+            raise ValueError("Could not find match for {}".format(synth_profile.disease))
+
+        # could dynamically generated num_classes here
+        # num_classes = len(sim_resp['matches'])
+
+        # store the disease rank or score
+        disease_score = 0
+        for disease_index, match in enumerate(sim_resp['matches']):
+            if match['matchId'] == synth_profile.disease:
+                if threshold_type == 'rank':
+                    disease_score = disease_index
+                elif threshold_type == 'probability':
+                    disease_score = float(match['rawScore'])
+
+        # Create a list to track the number of positive hits per threshold
+        # This list should have the same number of indices as thresholds,
+        # conceptually they are two columns in a table
+
+        # For rank, we count the number of diseases for each rank, and compute
+        # the number of diseases per rank threshold by using sum,
+        # eg number of diseases <= rank 4 is sum(positives[0:5])
+
+        # For probability, we count the number of labels <= to each probability
+        # therefore to get the total count at an index, get the val of positives[index]
+        positives = []
+
+        if threshold_type == 'rank':
+            positives = [0 for r in range(0, len(thresholds) + 1)]
+            owlsim_ranks = [match['rank'] for match in sim_resp['matches']]
+            avg_ranks = rerank_by_average(owlsim_ranks)
+            disease_score = avg_ranks[disease_score]
+
+            for rnk in avg_ranks:
+                positives[rnk] += 1
+            positives.pop(0)  # ranks start at 1, so make 1st rank the 0th index
+
+        elif threshold_type == 'probability':
+            scores = numpy.array([float(match['rawScore']) for match in sim_resp['matches']])
+            positives = [0 for r in range(0, len(thresholds))]
+            for index, prob in enumerate(thresholds):
+                score_count = 0
+                if index == 0:
+                    positives[index] = 0
+                else:
+                    positives[index] = positives[index-1]
+                for score in scores:
+                    if score >= prob:
+                        score_count += 1
+                    else:
+                        break
+                positives[index] += score_count
+                scores = scores[score_count:]
+
+        else:
+            raise ValueError("{} not valid threshold".format(threshold_type))
+
+        for index, threshold in enumerate(thresholds):
+            true_pos, false_pos, false_neg, true_neg = confusion_by_rank[threshold]
+
+            is_true_pos = False
+            if threshold_type == 'rank':
+                is_true_pos = disease_score <= threshold
+                positive_diseases = sum(positives[0:cutoff])
+            elif threshold_type == 'probability':
+                is_true_pos = disease_score >= threshold
+                positive_diseases = positives[index]
+            else:
+                raise ValueError
+
+            if is_true_pos:
+                true_pos += 1
+                true_neg += num_labels - positive_diseases
+                false_pos += positive_diseases - 1
+            else:
+                false_neg += 1
+                false_pos += positive_diseases
+                true_neg += num_labels - positive_diseases - 1
+
+            confusion_by_rank[threshold] = [true_pos, false_pos, false_neg, true_neg]
+
+    queue.put(confusion_by_rank)

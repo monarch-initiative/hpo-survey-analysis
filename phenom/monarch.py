@@ -3,7 +3,7 @@ import logging
 import json
 from json import JSONDecodeError
 import copy
-from typing import Dict, Tuple, Set, Optional, List
+from typing import Dict, Tuple, Set, Optional, List, Iterable
 
 logger = logging.getLogger(__name__)
 
@@ -13,10 +13,11 @@ such as scigraph, owlsim, solr, and the monarch app
 """
 
 # Globals and Constants
-SCIGRAPH_URL  = 'https://scigraph-ontology-dev.monarchinitiative.org/scigraph'
-OWLSIM_URL    = 'https://monarchinitiative.org/owlsim/'
-MONARCH_SCORE = 'https://monarchinitiative.org/score'
-MONARCH_ASSOC = 'https://solr.monarchinitiative.org/solr/golr/select'
+SCIGRAPH_URL   = 'https://scigraph-ontology-dev.monarchinitiative.org/scigraph'
+OWLSIM_URL     = 'https://monarchinitiative.org/owlsim/'
+OWLSIM3_URL    = 'http://owlsim3-dev.monarchinitiative.org/'
+MONARCH_SCORE  = 'https://monarchinitiative.org/score'
+MONARCH_ASSOC  = 'https://solr.monarchinitiative.org/solr/golr/select'
 MONARCH_SEARCH = 'https://solr.monarchinitiative.org/solr/search/select'
 # https://github.com/monarch-initiative/hpo-plain-index
 HPO_SOLR = 'https://solr.monarchinitiative.org/solr/hpo-pl/select'
@@ -113,6 +114,21 @@ def get_annotation_sufficiency_score(id_list):
     score['categorical_score'] = response['categorical_score']
 
     return score
+
+
+def owlsim_classify(
+        profile: Iterable,
+        limit: Optional[int] = 200,
+        url: Optional[str] = OWLSIM3_URL) -> Dict:
+    """
+    :raises ValueError: If the response body does not contain valid json.
+    """
+    params = {
+        'id': profile,
+        'limit': limit
+    }
+    sim_req = requests.get(url, params)
+    return sim_req.json()
 
 
 def owlsim_compare(profile_a, profile_b):
