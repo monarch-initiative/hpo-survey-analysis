@@ -88,7 +88,6 @@ def rerank_by_average(ranks: List[int]) -> List[int]:
     """
     Given a list of ranked results, averages ties and
     reranks following
-    :param matches:
     :return: List of ranks
     """
     # list to store adjusted ranks
@@ -136,8 +135,7 @@ def create_confusion_matrix_per_threshold(
         owlsim_url: str,
         num_labels: int,
         thresholds: List,
-        threshold_type: str,
-        queue: Queue):
+        threshold_type: str):
 
     confusion_by_rank: Dict[int, List[int]] = {}
 
@@ -152,10 +150,6 @@ def create_confusion_matrix_per_threshold(
         if counter % 1000 == 0:
             logging.info("processed {} patients out of {}".format(counter, total))
         counter += 1
-
-        # Useful for testing
-        if counter == 100:
-            break
 
         sim_resp = owlsim_classify(synth_profile.phenotypes, num_labels, owlsim_url)
 
@@ -222,7 +216,7 @@ def create_confusion_matrix_per_threshold(
             is_true_pos = False
             if threshold_type == 'rank':
                 is_true_pos = disease_score <= threshold
-                positive_diseases = sum(positives[0:cutoff])
+                positive_diseases = sum(positives[0:threshold])
             elif threshold_type == 'probability':
                 is_true_pos = disease_score >= threshold
                 positive_diseases = positives[index]
@@ -240,4 +234,23 @@ def create_confusion_matrix_per_threshold(
 
             confusion_by_rank[threshold] = [true_pos, false_pos, false_neg, true_neg]
 
-    queue.put(confusion_by_rank)
+    return confusion_by_rank
+
+
+def process_confusion_matrix_per_threshold(
+        synthetic_profiles: List[SyntheticProfile],
+        owlsim_url: str,
+        num_labels: int,
+        thresholds: List,
+        threshold_type: str,
+        queue: Queue) -> None:
+    """
+    Run create_confusion_matrix_per_threshold and put results in queue object
+    """
+    queue.put(create_confusion_matrix_per_threshold(
+        synthetic_profiles,
+        owlsim_url,
+        num_labels,
+        thresholds,
+        threshold_type
+    ))

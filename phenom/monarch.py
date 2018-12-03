@@ -15,7 +15,8 @@ such as scigraph, owlsim, solr, and the monarch app
 # Globals and Constants
 SCIGRAPH_URL   = 'https://scigraph-ontology-dev.monarchinitiative.org/scigraph'
 OWLSIM_URL     = 'https://monarchinitiative.org/owlsim/'
-OWLSIM3_URL    = 'http://owlsim3-dev.monarchinitiative.org/'
+OWLSIM3_URL    = 'http://owlsim3-dev.monarchinitiative.org/api/' \
+                 'match/naive-bayes-fixed-weight-two-state'
 MONARCH_SCORE  = 'https://monarchinitiative.org/score'
 MONARCH_ASSOC  = 'https://solr.monarchinitiative.org/solr/golr/select'
 MONARCH_SEARCH = 'https://solr.monarchinitiative.org/solr/search/select'

@@ -7,7 +7,7 @@ from typing import Dict, Set, List
 import gzip
 import multiprocessing
 from multiprocessing import Process, Queue
-from phenom.utils.simulate import create_confusion_matrix_per_threshold
+from phenom.utils.simulate import process_confusion_matrix_per_threshold
 from phenom.model.synthetic import SyntheticProfile
 import numpy
 
@@ -82,7 +82,7 @@ result_list = []
 
 # Split into chunks depending on args.processes
 for chunk in [synthetic_profiles[i::args.processes] for i in range(args.processes)]:
-    proc = Process(target=create_confusion_matrix_per_threshold,
+    proc = Process(target=process_confusion_matrix_per_threshold,
                    args=(chunk, owlsim_match, classes_to_eval,
                          cutoffs, threshold_typ, queue))
     proc.start()

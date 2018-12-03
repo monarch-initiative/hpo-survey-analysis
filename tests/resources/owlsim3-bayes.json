@@ -1,0 +1,64 @@
+{
+    "matches": [
+        {
+            "matchId": "MONDO:0008394",
+            "matchLabel": "Silver-Russell syndrome",
+            "rawScore": 0.9958828920983469,
+            "rank": 1
+        },
+        {
+            "matchId": "MONDO:0008318",
+            "matchLabel": "Proteus syndrome",
+            "rawScore": 0.00410012081209564,
+            "rank": 2
+        },
+        {
+            "matchId": "MONDO:0008393",
+            "matchLabel": "Rubinstein-Taybi syndrome due to CREBBP mutations",
+            "rawScore": 0.00410012081209564,
+            "rank": 2
+        },
+        {
+            "matchId": "MONDO:0007924",
+            "matchLabel": "Bannayan-Riley-Ruvalcaba syndrome",
+            "rawScore": 0.00410012081209564,
+            "rank": 2
+        },
+        {
+            "matchId": "MONDO:0008681",
+            "matchLabel": "WAGR syndrome",
+            "rawScore": 2.3676995967932742E-8,
+            "rank": 3
+        },
+        {
+            "matchId": "MONDO:0007235",
+            "matchLabel": "branchiooculofacial syndrome",
+            "rawScore": 1.9315017774343367E-9,
+            "rank": 4
+        },
+        {
+            "matchId": "MONDO:0008021",
+            "matchLabel": "Cowden syndrome 1",
+            "rawScore": 4.093430249032567E-10,
+            "rank": 5
+        },
+        {
+            "matchId": "MONDO:0007617",
+            "matchLabel": "Coffin-Siris syndrome 1",
+            "rawScore": 1.1022331837240941E-10,
+            "rank": 6
+        },
+        {
+            "matchId": "MONDO:0009954",
+            "matchLabel": "Ramon syndrome",
+            "rawScore": 7.710101862269605E-100,
+            "rank": 7
+        },
+        {
+            "matchId": "MONDO:0011911",
+            "matchLabel": "craniolenticulosutural dysplasia",
+            "rawScore": 4.9085510075468497E-500,
+            "rank": 8
+        }
+    ]
+}
