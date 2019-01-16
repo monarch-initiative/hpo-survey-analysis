@@ -34,13 +34,13 @@ make install &&  cd /build
 
 # Download bindings
 wget http://download.librdf.org/source/redland-bindings-1.0.17.1.tar.gz
-wget http:/Postprocessor.java#L71/download.librdf.org/source/redland-bindings-1.0.17.1.tar.gz.asc
+wget http://download.librdf.org/source/redland-bindings-1.0.17.1.tar.gz.asc
 gpg --no-default-keyring --verify redland-bindings-1.0.17.1.tar.gz.asc redland-bindings-1.0.17.1.tar.gz
 tar -zxf redland-bindings-1.0.17.1.tar.gz && cd redland-bindings-1.0.17.1
-./configure --with-python=python3 && cd python
+./configure --with-python=python3.7 && cd python
 make install DESTDIR=/build && cd /build
 
-cp /build/usr/local/lib/python3.7/site-packages/RDF.py redland-bindings/
-cp /build/usr/local/lib/python3.7/site-packages/*Redland* redland-bindings/
+cp /build/usr/lib/python3/dist-packages/RDF.py redland-bindings/
+cp /build/usr/lib/python3/dist-packages/*Redland* redland-bindings/
 
 tar -zcf redland-bindings.tar.gz redland-bindings

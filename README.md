@@ -19,12 +19,15 @@ seand performing semantic similarity and distance computations
     
 ##### Adding Redland Python Bindings
 
-A dockerfile is provided for building the Redland C dynamic library for operating
-systems running glibc and the python bindings.  See http://librdf.org/
+A dockerfile is provided for building the Redland C dynamic library and
+the python bindings for Ubuntu distributions.  See http://librdf.org/
 
 To build:
 
     cd redland
+    # Build the Dockerfile
+    ./build-dockerfile.sh
+    
     # Build Docker image
     docker build . --tag redland:latest
 
