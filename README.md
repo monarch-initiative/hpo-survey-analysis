@@ -16,30 +16,6 @@ seand performing semantic similarity and distance computations
     source venv/bin/activate
     pip install -r requirements.txt
     export PYTHONPATH=.:$PYTHONPATH
-    
-##### Adding Redland Python Bindings
-
-A dockerfile is provided for building the Redland C dynamic library and
-the python bindings for Ubuntu distributions.  See http://librdf.org/
-
-To build:
-
-    cd redland
-    # Build the Dockerfile
-    ./build-dockerfile.sh
-    
-    # Build Docker image
-    docker build . --tag redland:latest
-
-    # Build C binary and python lib from source 
-    docker run --name build-redland redland
-
-    # Copy binary and python src files
-    docker cp build-redland:/build/redland-bindings.tar.gz ./
-    
-    # Extract and copy into virtual environment
-    tar -zxvf redland-bindings.tar.gz
-    mv redland-bindings/* ../venv/lib/python3.7/site-packages/
 
 
 ##### Running notebooks with docker
