@@ -20,6 +20,17 @@ def flip_matrix(matrix: Sequence[Sequence]) -> List[List]:
     return flipped_matrix
 
 
+def sym_bma_score(matrix: Sequence[Sequence[Num]]) -> float:
+    """
+    symmetric best max average score
+    """
+    forwards = [max(row) for row in matrix]
+    flipped = flip_matrix(matrix)
+    backwards = [max(row) for row in flipped]
+    combined_maxes = forwards + backwards
+    return mean(combined_maxes)
+
+
 def max_score(matrix: Sequence[Sequence[Num]]) -> float:
     return max(list(chain.from_iterable(matrix)))
 
@@ -53,7 +64,7 @@ def max_percentage_score(
 def bma_percentage_score(
         query_matrix: Sequence[Sequence[Num]],
         optimal_matrix: Sequence[Sequence[Num]]) -> float:
-    return bma_score(query_matrix) / bma_score(optimal_matrix)
+    return sym_bma_score(query_matrix) / sym_bma_score(optimal_matrix)
 
 
 def avg_percentage_score(
