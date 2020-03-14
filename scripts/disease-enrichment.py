@@ -16,7 +16,7 @@ https://github.com/biolink/ontobio/blob/d2ab6f/ontobio/assocmodel.py#L432
 scipy version of fisher exact is much faster
 """
 from phenom import monarch
-from phenom.utils.owl_utils import get_closure
+from phenom.utils.owl_utils import get_closure, get_descendants
 from scipy.stats import fisher_exact
 from rdflib import Graph
 import gzip
@@ -31,8 +31,6 @@ parser.add_argument('--mondo_assoc', '-a', type=str, required=False,
                     help='path to mondo to phenotype assoc 2 column tsv')
 parser.add_argument('--lay_pheno', '-l', type=str, required=False,
                     help='path to lay phenotypes 1 column txt')
-parser.add_argument('--not_lay_pheno', '-nl', type=str, required=False,
-                    help='path to nonlay phenotypes 1 column txt')
 parser.add_argument('--output', '-o', type=str, required=False,
                     help='Location of output file', default="./enrichment.tsv")
 args = parser.parse_args()
@@ -40,20 +38,20 @@ args = parser.parse_args()
 # i/o
 output = open(args.output, "w")
 
-include_inferred = False
+# for including inferred phenotype annotations
+# inferred disease annotations always included
+include_inferred = True
 lay_phenotypes = set()
 not_lay_phenotypes = set()
 mondo_diseases_tmp = dict()
 mondo_diseases = dict()
 associations = []
 
-if args.lay_pheno and args.not_lay_pheno:
+if args.lay_pheno:
     with open(args.lay_pheno, 'r') as lay_pheno:
         for line in lay_pheno:
             lay_phenotypes.add(line.rstrip("\n"))
-    with open(args.not_lay_pheno, 'r') as not_lay_pheno:
-        for line in not_lay_pheno:
-            not_lay_phenotypes.add(line.rstrip("\n"))
+
 else:
     lay_phenotypes, not_lay_phenotypes = monarch.get_layslim()
 
@@ -67,14 +65,25 @@ if args.mondo_labels:
 else:
     mondo_diseases_tmp = monarch.get_mondo_classes()
 
+
+hpo = Graph()
+hpo.parse("../data/owl/hp.owl", format='xml')
+root = "HP:0000118"
+phenotype_terms = get_descendants(hpo, root)
+not_lay_phenotypes = phenotype_terms - lay_phenotypes
+
+if not include_inferred:
+    hpo = None  # free up some mem
+
+print("{} phenotypes in outer set".format(len(not_lay_phenotypes)))
+
 if args.mondo_assoc:
     print("Fetching associations from cache file")
     counter = 0
-    hpo = Graph()
+
     mondo = Graph()
-    mondo.parse(gzip.open("../data/mondo.owl.gz", 'rb'), format='xml')
-    if include_inferred:
-        hpo.parse("../data/hp.owl", format='xml')
+    mondo.parse(gzip.open("../data/owl/mondo.owl.gz", 'rb'), format='xml')
+
     with open(args.mondo_assoc, 'r') as mondo_labels:
         for line in mondo_labels:
             if line.startswith('#'): continue
@@ -88,6 +97,13 @@ if args.mondo_assoc:
                 mondo_diseases[disease] = "obsoleted class"
 
             disease_closure = get_closure(mondo, disease, root='MONDO:0000001')
+
+            for dis in disease_closure:
+                try:
+                    mondo_diseases[dis] = mondo_diseases_tmp[dis]
+                except KeyError:
+                    mondo_diseases[dis] = "obsoleted class"
+
             if include_inferred:
                 phenotype_closure = get_closure(hpo, phenotype, root='HP:0000118')
                 associations.append((disease_closure, phenotype_closure))
@@ -147,6 +163,8 @@ for disease, label in mondo_diseases.items():
         'p-value-correct': p_value * hypothesis_count
     })
     counter += 1
+
+print("Processed {} out of {} diseases".format(counter, hypothesis_count))
 
 associations = None
 # sort results
