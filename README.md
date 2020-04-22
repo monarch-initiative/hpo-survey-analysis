@@ -34,5 +34,5 @@ seand performing semantic similarity and distance computations
 
 
 #### Example Surveys of Interest
-- Phenotypr: https://phenotypr.com/
+- Phenotypr: http://body.phenotypr.com/phenotypr/
 - GenomeConnect: https://www.genomeconnect.org/
