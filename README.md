@@ -4,7 +4,7 @@ A library for analyzing surveys utilizing the HPO
 
 #### What's Included?
 - phenom: a python library with modules for querying monarch remote services, working with ontologies,
-seand performing semantic similarity and distance computations
+and performing semantic similarity and distance computations
 - Jupyter notebooks demoing various tasks
 - Scripts for generating synthetic patient data, clustering, and evaluation
 
