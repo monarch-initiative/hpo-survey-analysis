@@ -159,6 +159,10 @@ for disease, label in mondo_diseases.items():
     results.append({
         'id': disease,
         'label': label,
+        'lay annotated to disease': len(lay_annotated),
+        'lay not annotated to disease': lay_not_annotated,
+        'clinical annotated to disease': len(background_annot),
+        'clinical not annotated to disease': background_not_annot,
         'p-value': p_value,
         'p-value-correct': p_value * hypothesis_count
     })
@@ -170,10 +174,23 @@ associations = None
 # sort results
 sorted_results = sorted(results, key=lambda k: k['p-value'])
 
+headers = [
+    'id',
+    'label',
+    'lay annotated to disease',
+    'lay not annotated to disease',
+    'clinical annotated to disease',
+    'clinical not annotated to disease',
+    'p-value',
+    'p-value-correct'
+]
+
+header_line = "\t".join(headers)
+
+output.write(f"{header_line}\n")
+
 for res in sorted_results:
-    output.write("{}\t{}\t{}\t{}\n".format(
-        res['id'],
-        res['label'],
-        res['p-value'],
-        res['p-value-correct']
-    ))
+    result = "\t".join([
+        str(res[field]) for field in headers
+    ])
+    output.write(f"{result}\n")

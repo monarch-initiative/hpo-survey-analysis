@@ -78,12 +78,6 @@ for synth_id, profile in simulated_profiles.items():
     )
     synthetic_profiles.append(syn_profile)
 
-classes_to_eval = 7344
-
-#cutoffs = numpy.geomspace(1e-300, 1, classes_to_eval*5)
-#cutoffs = numpy.flip(cutoffs)
-#cutoffs = numpy.append(cutoffs, 0)
-
 cutoffs = numpy.arange(0, 100, 0.2)
 cutoffs = numpy.flip(cutoffs)
 
@@ -125,12 +119,12 @@ for disease, confusions in disease_confusion_matrices.items():
     for confusion in confusions:
         confusion_threshold, confusion_matrix = confusion
         true_pos, false_pos, false_neg, true_neg = confusion_matrix
-        output_line = [
+        output_line = "\t".join([
             disease,
-            confusion_threshold,
-            true_pos,
-            false_pos,
-            false_neg,
-            true_neg
-        ]
+            str(confusion_threshold),
+            str(true_pos),
+            str(false_pos),
+            str(false_neg),
+            str(true_neg)
+        ])
         output.write(f'{output_line}\n')
