@@ -31,7 +31,7 @@ def create_confusion_matrix_per_threshold(
 
     logger.info("Generating confusion matrices")
     for patient_index, syn_profile in enumerate(synthetic_profiles):
-        if patient_index % 1 == 0:
+        if patient_index % 100 == 0:
             logger.info(f"Processed {patient_index} profiles out of {len(synthetic_profiles)}")
 
         for test_disease, gold_standard in annotations.items():
