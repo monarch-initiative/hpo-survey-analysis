@@ -5,6 +5,6 @@ prefixcommons
 numpy
 scipy
 matplotlib
-sklearn
+scikit-learn
 pytest
 pumpkin-py
