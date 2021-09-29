@@ -93,15 +93,13 @@ hpo = None
 hpo_with_three_or_more_annotations = {k for k,v in hpo_with_annotation.items() if v >= 3}
 hpo_with_five_or_more_annotations = {k for k,v in hpo_with_annotation.items() if v >= 5}
 
-for disease, label in mondo_diseases.items():
+# filter out diseases without phenotypes
+associations = {disease: associations for disease, associations in associations.items() if len(associations) > 0}
 
-    if len(associations[disease]) == 0:
-        continue
+for disease, association in associations.items():
 
     if counter % 100 == 0:
         print("Processed {} diseases".format(counter))
-
-    # if counter > 100: break
 
     # phenotypes annotated to disease class
     lay_annotated = set()
@@ -120,20 +118,20 @@ for disease, label in mondo_diseases.items():
     gc_subsumed_gt_75 = 0
     gc_subsumed_100 = 0
 
-    lay_in_disease = lay_phenotypes & associations[disease]
-    gc_in_disease = gc_phenotypes & associations[disease]
+    lay_in_disease = lay_phenotypes & association
+    gc_in_disease = gc_phenotypes & association
     lay_annotated = lay_annotated | lay_in_disease
     gc_annotated = gc_annotated | gc_in_disease
-    all_annot = all_annot | associations[disease]
+    all_annot = all_annot | association
 
-    for other_disease in mondo_diseases.keys():
+    for other_disease, other_association in associations.items():
         if other_disease == disease: continue
 
         # len(intersection(lay, gold)) / len(lay)
-        lay_proportion_subsumed = hpo_sim.proportion_subset(lay_in_disease, associations[other_disease], False)
+        lay_proportion_subsumed = hpo_sim.proportion_subset(lay_in_disease, other_association, False)
 
         # len(intersection(lay, gold)) / len(gold)
-        # lay_proportion_subsumed = hpo_sim.proportion_subset(associations[other_disease], lay_in_disease, False)
+        # lay_proportion_subsumed = hpo_sim.proportion_subset(other_association, lay_in_disease, False)
 
         # why is there no case switch
         if lay_proportion_subsumed > .25:
@@ -149,10 +147,10 @@ for disease, label in mondo_diseases.items():
             lay_subsumed_100 += 1
 
         # len(intersection(gc, gold)) / len(gc)
-        gc_proportion_subsumed = hpo_sim.proportion_subset(gc_in_disease, associations[other_disease], False)
+        gc_proportion_subsumed = hpo_sim.proportion_subset(gc_in_disease, other_association, False)
 
         # len(intersection(gc, gold)) / len(gold)
-        # gc_proportion_subsumed = hpo_sim.proportion_subset(associations[other_disease], gc_in_disease, False)
+        # gc_proportion_subsumed = hpo_sim.proportion_subset(other_association, gc_in_disease, False)
 
         if gc_proportion_subsumed > .25:
             gc_subsumed_gt_25 += 1
@@ -169,7 +167,7 @@ for disease, label in mondo_diseases.items():
 
     results.append({
         'id': disease,
-        'label': label,
+        'label': mondo_disease_labels[disease],
         'clinical annotated to disease': len(all_annot),
         'lay annotated to disease': len(lay_annotated),
         'gc annotated to disease': len(gc_annotated),
