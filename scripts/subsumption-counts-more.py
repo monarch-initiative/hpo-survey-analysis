@@ -79,8 +79,6 @@ with open(args.mondo_assoc, 'r') as mondo_labels:
         for phen in phenotype_closure:
             hpo_with_annotation[phen] += 1
 
-        if len(phenotype_closure) == 0: continue
-
         associations[disease] = associations[disease].union(phenotype_closure)
 
         counter += 1
@@ -96,6 +94,9 @@ hpo_with_three_or_more_annotations = {k for k,v in hpo_with_annotation.items() i
 hpo_with_five_or_more_annotations = {k for k,v in hpo_with_annotation.items() if v >= 5}
 
 for disease, label in mondo_diseases.items():
+
+    if len(associations[disease]) == 0:
+        continue
 
     if counter % 100 == 0:
         print("Processed {} diseases".format(counter))
