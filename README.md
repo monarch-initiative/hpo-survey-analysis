@@ -1,5 +1,5 @@
 ### HPO survey analysis
-A library for analyzing surveys utilizing the HPO
+A library for analyzing surveys using the HPO
 
 
 #### What's Included?
