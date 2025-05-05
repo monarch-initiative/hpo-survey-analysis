@@ -1,5 +1,5 @@
 """
-A subsumption analysis that produces a matrix output with threshold bins (0-5, 6-10, etc.)
+A subsumption analysis that produces a matrix output with bins of 0-5%, 6-10%, etc.
 """
 import argparse
 from collections import defaultdict
@@ -80,74 +80,71 @@ with open(args.mondo_assoc, 'r') as mondo_labels:
 
 print(f"Processed {counter} associations")
 
+# filter out diseases without phenotypes
+associations = {d: phenos for d, phenos in associations.items() if len(phenos) > 0}
+
+# Define bins in increments of 5%: 0-5, 6-10, 11-15, ..., 96-100
+bins = [(i, i + 5) for i in range(0, 100, 5)]
+bin_labels = [f"{start}-{end}" for start, end in bins]
+
+# Initialize data structure to store binned counts
+# For each bin, store counts for each category (lay, gc, lay_and_gc)
+binned_counts = {
+    'lay': {f"{start}-{end}": 0 for start, end in bins},
+    'gc': {f"{start}-{end}": 0 for start, end in bins},
+    'lay_and_gc': {f"{start}-{end}": 0 for start, end in bins}
+}
+
 counter = 0
 
-hpo_with_three_or_more_annotations = {k for k, v in hpo_with_annotation.items() if v >= 3}
-hpo_with_five_or_more_annotations = {k for k, v in hpo_with_annotation.items() if v >= 5}
-
-# filter out diseases without phenotypes
-associations = {disease: phenos for disease, phenos in associations.items() if len(phenos) > 0}
-
-# Define threshold bins
-# We'll use 0-5, 6-10, 11-15, ..., 96-100
-bins = [(i, i + 5) for i in range(0, 101, 5)]
-
-# Initialize dictionaries to hold binned counts for each category across all diseases
-lay_bin_counts = defaultdict(int)
-gc_bin_counts = defaultdict(int)
-lay_and_gc_bin_counts = defaultdict(int)
-
+# For each disease, calculate proportion_subsumed and add to appropriate bin
 for disease, association in associations.items():
     if counter % 100 == 0:
-        print("Processed {} diseases".format(counter))
+        print(f"Processing disease {counter} of {len(associations)}")
 
-    lay_in_disease = lay_phenotypes & association
-    gc_in_disease = gc_phenotypes & association
-    lay_and_gc_in_disease = lay_and_gc_phenotypes & association
+    # Calculate proportion for each category using hpo_sim.proportion_subset
+    # and place in appropriate bin
+    if lay_phenotypes:  # Make sure there are lay phenotypes to avoid division by zero
+        # Calculate proportion of lay phenotypes subsumed by this disease
+        lay_proportion = hpo_sim.proportion_subset(association, lay_phenotypes, False) * 100
+        print(lay_proportion)
+        # Find which bin this falls into
+        for (start, end) in bins:
+            if start <= lay_proportion < end:  # Add small epsilon to include exact values
+                binned_counts['lay'][f"{start}-{end}"] += 1
+                break
+        # If proportion is 0, add to the 0-5 bin
+        if lay_proportion == 0:
+            binned_counts['lay']["0-5"] += 1
 
-    # Skip processing if there are no phenotype annotations
-    if not lay_in_disease and not gc_in_disease and not lay_and_gc_in_disease:
-        counter += 1
-        continue
+    if gc_phenotypes:
+        gc_proportion = hpo_sim.proportion_subset(association, gc_phenotypes, False) * 100
+        for (start, end) in bins:
+            if start <= gc_proportion < end:
+                binned_counts['gc'][f"{start}-{end}"] += 1
+                break
+        if gc_proportion == 0:
+            binned_counts['gc']["0-5"] += 1
 
-    for other_disease, other_association in associations.items():
-        if other_disease == disease: continue
-
-        # Calculate proportion subsumed for each category
-        lay_proportion = hpo_sim.proportion_subset(lay_in_disease, other_association,
-                                                   False) * 100 if lay_in_disease else 0
-        gc_proportion = hpo_sim.proportion_subset(gc_in_disease, other_association, False) * 100 if gc_in_disease else 0
-        lay_and_gc_proportion = hpo_sim.proportion_subset(lay_and_gc_in_disease, other_association,
-                                                          False) * 100 if lay_and_gc_in_disease else 0
-
-        # Assign to appropriate bin
-        for bin_start, bin_end in bins:
-            bin_label = f"{bin_start}-{bin_end}"
-
-            if bin_start <= lay_proportion < bin_end or (bin_end == 100 and lay_proportion == 100):
-                lay_bin_counts[bin_label] += 1
-
-            if bin_start <= gc_proportion < bin_end or (bin_end == 100 and gc_proportion == 100):
-                gc_bin_counts[bin_label] += 1
-
-            if bin_start <= lay_and_gc_proportion < bin_end or (bin_end == 100 and lay_and_gc_proportion == 100):
-                lay_and_gc_bin_counts[bin_label] += 1
+    if lay_and_gc_phenotypes:
+        lay_and_gc_proportion = hpo_sim.proportion_subset(association, lay_and_gc_phenotypes, False) * 100
+        for (start, end) in bins:
+            if start <= lay_and_gc_proportion < end:
+                binned_counts['lay_and_gc'][f"{start}-{end}"] += 1
+                break
+        if lay_and_gc_proportion == 0:
+            binned_counts['lay_and_gc']["0-5"] += 1
 
     counter += 1
 
-print("Processed {} diseases".format(counter))
+print(f"Processed {counter} diseases")
 
-# Generate bin labels for columns
-bin_labels = [f"{bin_start}-{bin_end}" for bin_start, bin_end in bins]
+# Write output with bins as columns and categories as rows
+output.write("Category\t" + "\t".join(bin_labels) + "\n")
 
-# Write the headers
-header_line = "Category\t" + "\t".join(bin_labels)
-output.write(f"{header_line}\n")
-
-# Write the data for each category
-output.write(f"lay\t" + "\t".join([str(lay_bin_counts[bin_label]) for bin_label in bin_labels]) + "\n")
-output.write(f"gc\t" + "\t".join([str(gc_bin_counts[bin_label]) for bin_label in bin_labels]) + "\n")
-output.write(f"lay_and_gc\t" + "\t".join([str(lay_and_gc_bin_counts[bin_label]) for bin_label in bin_labels]) + "\n")
+for category in ['lay', 'gc', 'lay_and_gc']:
+    row_values = [str(binned_counts[category][bin_label]) for bin_label in bin_labels]
+    output.write(f"{category}\t" + "\t".join(row_values) + "\n")
 
 output.close()
-print("Results written to", args.output)
+print("Output written to", args.output)
