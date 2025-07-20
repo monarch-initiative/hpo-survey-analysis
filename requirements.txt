@@ -7,4 +7,4 @@ scipy
 matplotlib
 scikit-learn
 pytest
-pumpkin-py
+pumpkin-py @ git+https://github.com/kshefchek/pumpkin-py@main
